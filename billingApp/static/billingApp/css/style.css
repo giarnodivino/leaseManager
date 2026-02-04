@@ -1,0 +1,29 @@
+.menu {
+  position: sticky;
+  display: inline-block;
+  vertical-align: top;
+  max-height: 100vh;
+  overflow-y: auto;
+  width: 200px;
+  top: 0;
+  bottom: 0;
+  padding: 30px;
+}
+
+.content {
+  display: inline-block;
+}
+
+.overviewCards {
+  background-color: #f4f4f4 !important;
+}
+
+.card2 {
+  background-color: #f4f4f4 !important;
+  min-height: 500px !important;
+}
+
+.card1 {
+  margin-left: 80px !important;
+  width: 1200px !important;
+}

@@ -1,0 +1,43 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+
+</div>
+
+<div class="card card2">
+  <div class="card-content">
+    <h1 class="is-size-3 has-text-weight-bold">Add Building</h1>
+    <form method="POST" action="{% url 'add_building' %}">
+        {% csrf_token %}
+      <div class="columns is-justify-content-center p-5 is-variable is-6">
+        <div class="column is-3">
+          <label for="buildingName">Building Name:</label>
+          <input type="text" class="input" id="buildingName" name="buildingName" required />
+        </div>
+        <div class="column is-5">
+          <label for="buildingAddress">Address:</label>
+          <input type="text" class="input" id="buildingAddress" name="buildingAddress" required />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center p-5 is-variable is-6">
+        <div class="column is-3">
+          <label for="name">Room Capacity</label>
+          <input type="number" class="input" id="roomCapacity" name="roomCapacity" required />
+        </div>
+        <div class="column is-5">
+          <label for="signageCapacity">Signage Capacity:</label>
+          <input type="number" class="input" id="signageCapacity" name="signageCapacity" required />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center p-5 is-variable is-6">
+        <div class="column is-3">
+          <label for="parkingCapacity">Parking Capacity</label>
+          <input type="number" class="input" id="parkingCapacity" name="parkingCapacity" required />
+        </div>
+        <div class="column is-5 mt-5">
+            <button type="submit" class="button is-primary">Submit</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

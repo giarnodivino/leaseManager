@@ -1,0 +1,75 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+
+</div>
+
+<div class="card card2">
+  <div class="card-content">
+    <h1 class="is-size-3 has-text-weight-bold has-text-centered">Add Lease</h1>
+    <form method="POST" action="{% url 'add_lease' pk=t.id %}">
+      {% csrf_token %}
+      <div class="columns is-justify-content-center p-4">
+        <div class="column is-3 mt-3">
+          <div class="select is-fullwidth is-medium is-info">
+            <select name="building_id">
+              <option value="" class="">Select Building</option>
+              {% for b in buildings %}
+              <option value="{{ b.id }}">{{ b.buildingName }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="column is-3 mt-3">
+          <div class="select is-fullwidth is-medium is-info">
+            <select name="contractLength">
+              <option value="">Select Length</option>
+              <option value="12">12 Months</option>
+              <option value="6">6 Months</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-3">
+          <label for="rentAmount">Monthly Rent *</label>
+          <input
+            type="number"
+            class="input"
+            id="rentAmount"
+            name="rentAmount"
+            step="0.01"
+            min="0"
+            placeholder="Amount in PHP"
+            required
+          />
+        </div>
+        <div class="column is-3">
+          <label for="unitID">Unit *</label>
+          <input type="number" class="input" id="unitID" name="unitID" placeholder="Unit / Room Number" required />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-3">
+          <label for="parkingFees">Parking Fees:</label>
+          <input type="number" class="input" id="parkingFees" name="parkingFees" placeholder="Amount in PHP" />
+        </div>
+        <div class="column is-3">
+          <label for="signageFees">Signage Fees:</label>
+          <input type="number" class="input" id="signageFees" name="signageFees" placeholder="Amount in PHP" />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-3">
+          <label for="contractStart">Start Date:</label>
+          <input type="date" class="input" id="contractStart" name="contractStart" placeholder="" />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center">
+        <div class="column is-1">
+          <button type="submit" class="button is-primary">Submit</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

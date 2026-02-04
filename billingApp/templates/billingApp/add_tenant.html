@@ -1,0 +1,45 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+
+</div>
+
+<div class="card card2">
+  <div class="card-content">
+    <h1 class="is-size-3 has-text-weight-bold">Add Tenant</h1>
+    <form method="POST" action="{% url 'add_tenant' %}">
+      {% csrf_token %}
+      <div class="columns is-justify-content-center p-5 is-variable is-6">
+        <div class="column is-5">
+          <label for="contactPerson">Name of Contact Person *</label>
+          <input type="text" class="input" id="contactPerson" name="contactPerson" placeholder="Full Name" required />
+        </div>
+        <div class="column is-5">
+          <label for="phoneNumber">Phone Number *</label>
+          <input type="tel" class="input" id="phoneNumber" name="phoneNumber" placeholder="09xx xxx xxxx" required />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center p-5 is-variable is-6">
+        <div class="column is-5">
+          <label for="email">Email *</label>
+          <input type="email" class="input" id="email" name="email" placeholder="Email Address" required />
+        </div>
+        <div class="column is-5">
+          <label for="companyName">Company Name</label>
+          <input
+            type="text"
+            class="input"
+            id="companyName"
+            name="companyName"
+            placeholder="Ex. Jollibee Foods Corporation"
+          />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center p-4 is-variable">
+        <div class="column is-1 has-text-centered">
+          <button type="submit" class="button is-primary">Submit</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

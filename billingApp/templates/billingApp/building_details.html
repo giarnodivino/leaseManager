@@ -1,0 +1,24 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+
+</div>
+
+<div class="card card2">
+    <div class="card-content has-text-centered">
+        <h1 class="is-size-3 has-text-weight-bold p-5 mt-6">{{ b.buildingName }}</h1>
+        <p class="is-size-5 has-text-weight-normal p-3">Building Details:</p>
+        <p class="is-size-5 p-2">Room Capacity: <strong>{{ b.roomCapacity }}</strong> Units</p>
+        <p class="is-size-5 p-2">Parking Capacity: <strong>{{ b.parkingCapacity }}</strong> Slots</p>
+        <p class="is-size-5 p-2">Signage Capacity: <strong>{{ b.signageCapacity }}</strong> Slots</p>
+        <p class="is-size-5 p-2">Building Address: <strong>{{ b.buildingAddress }}</strong></p>
+        <div class="columns is-justify-content-center p-4">
+            <div class="column is-3">
+                <a href="" class="button">Edit Building Details</a>
+            </div>
+            <div class="column is-3">
+                <a href="{% url 'delete_building' pk=b.pk %}" class="button is-danger">DELETE BUILDING</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
