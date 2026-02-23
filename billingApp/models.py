@@ -117,5 +117,9 @@ class BillingRecord(models.Model):
 
         super().save(*args, **kwargs)
 
+    def billing_number(self):
+        if self.pk:
+            return f"BL-{self.pk:06d}"
+
     def __str__(self):
-        return str(self.pk) + ': ' + ' Bill for ' + str(self.tenant) 
+        return f"{self.billing_number()}: Bill for {self.tenant}"
