@@ -11,5 +11,9 @@ urlpatterns = [
     path('add_tenant/', views.add_tenant, name='add_tenant'),
     path('tenant_details/<int:pk>/', views.tenant_details, name='tenant_details'),
     path('delete_tenant/<int:pk>/', views.delete_tenant, name='delete_tenant'),
-    path('add_lease/<int:pk>/', views.add_lease, name='add_lease')
+    path('add_lease/<int:pk>/', views.add_lease, name='add_lease'),
+    path('delete_lease/<int:pk>/', views.delete_lease, name='delete_lease'),
+    path('billing_records_main/', views.billing_records_main, name='billing_records_main'),
+    path('view_bills/<int:pk>/', views.view_bills, name='view_bills'),
+    path('add_bill/<int:pk>/', views.add_bill, name='add_bill')
 ]

@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Tenant, Building, Lease
+from .models import Tenant, Building, Lease, BillingRecord
 
 # Create your views here.
 def home_page(request):
@@ -97,3 +97,58 @@ def add_lease(request, pk):
         return redirect('tenant_details', pk=tenant.pk)
     
     return render(request, 'billingApp/add_lease.html', {'t':tenant, 'tenants':tenant_objects, 'buildings':building_objects})
+
+def delete_lease(request, pk):
+    lease = get_object_or_404(Lease, pk=pk)
+
+    tenant_pk = lease.tenantName_id  
+
+    lease.delete()
+
+    return redirect('tenant_details', pk=tenant_pk)
+
+
+def billing_records_main(request):
+    tenants = Tenant.objects.all()
+    leases = Lease.objects.all()
+    return render(
+        request,
+        'billingApp/billing_records_main.html',
+        {'tenants': tenants, 'leases': leases}
+    )
+
+
+def view_bills(request, pk):
+    tenant = get_object_or_404(Tenant, pk=pk)
+    bills = BillingRecord.objects.filter(tenant=tenant).order_by("-dateIssued")
+    return render(request, 'billingApp/view_bills.html', {"tenant": tenant, "bills": bills})
+
+def add_bill(request, pk):
+    tenant = get_object_or_404(Tenant, pk=pk)
+
+    lease = (
+        Lease.objects
+        .filter(tenantName=tenant)
+        .order_by("-contractStart")
+        .first()
+    )
+
+    if request.method == "POST":
+        billing_for = request.POST.get("billingFor")
+        date_issued = request.POST.get("dateIssued")
+        amountdue = request.POST.get("payable")
+
+        if billing_for and date_issued:
+            BillingRecord.objects.create(
+                tenant=tenant,
+                lease=lease,
+                dateIssued=date_issued,
+                billingFor=billing_for,
+                amountDue=amountdue,
+            )
+        else:
+            return redirect("add_bill", pk=tenant.pk)
+        
+        return redirect("view_bills", pk=tenant.pk)
+
+    return render(request, "billingApp/add_bill.html", {"tenant": tenant, "lease": lease})

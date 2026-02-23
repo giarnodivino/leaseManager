@@ -62,16 +62,16 @@
         <p class="is-size-5 has-text-weight-normal">Start Date: <strong>{{ l.contractStart }}</strong></p>
         <p class="is-size-5 has-text-weight-normal">End Date: <strong>{{ l.contractEnd }}</strong></p>
         <p class="is-size-5 has-text-weight-normal">{{ l.buildingName }}</p>
-        {% endfor %}
         <div class="columns p-4 is-justify-content-center">
           <div class="columns p-4 is-justify-content-center">
             <div class="buttons is-centered">
               <a href="" class="button">EDIT LEASE</a>
               <a href="#" class="button">RENEW LEASE</a>
-              <a href="#" class="button is-danger">DELETE LEASE</a>
+              <a href="{% url 'delete_lease' pk=l.pk %}" class="button is-danger">DELETE LEASE</a>
             </div>
           </div>
         </div>
+        {% endfor %}
       </div>
     </div>
   </div>

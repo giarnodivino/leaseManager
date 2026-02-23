@@ -27,3 +27,11 @@
   margin-left: 80px !important;
   width: 1200px !important;
 }
+
+.card3 {
+  min-height: 500px !important;
+}
+
+thead {
+  background-color: #fafafa !important;
+}

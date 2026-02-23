@@ -35,7 +35,7 @@
             <a href="#" class="button">Filter</a>
           </div>
           <div class="column">
-            <h1 class="is-size-4 has-text-weight-bold has-text-centered">TENANT LIST</h1>
+            <h1 class="is-size-4 has-text-weight-bold has-text-centered">TENANT LIST (BILLS)</h1>
           </div>
           <div class="column mt-3 has-text-right">
             <p>search bar here</p>
@@ -47,18 +47,21 @@
             <div class="card">
               <div class="card-content">
                 <div class="columns is-multiline">
-                
                   <div class="column">
-                    <h2 class="is-size-5 has-text-weight-semibold mb-1">{{t.companyName}}</h2>
-                    <p class="is-size-6 has-text-weight-normal">Contact Person: <strong>{{t.contactPerson}}</strong></p>
-                    <p class="is-size-6 has-text-weight-normal">Contact Number: <strong>{{t.phoneNumber}}</strong></p>
+                    <h2 class="is-size-5 has-text-weight-semibold mb-1">{{ t.companyName }}</h2>
+                    <p class="is-size-6 has-text-weight-normal">
+                      Contact Person:
+                      <strong>{{ t.contactPerson }}</strong>
+                    </p>
+                    <p class="is-size-6 has-text-weight-normal">
+                      Contact Number:
+                      <strong>{{ t.phoneNumber }}</strong>
+                    </p>
+                  </div>
 
-                  </div>
-                
                   <div class="column is-2">
-                    <a href="{% url 'tenant_details' t.id %}" class="button">VIEW DETAILS</a>
+                    <a href="{% url 'view_bills' pk=t.pk %}" class="button">VIEW BILLS</a>
                   </div>
-                  
                 </div>
               </div>
             </div>
@@ -69,6 +72,5 @@
     </div>
   </div>
 </div>
-
 
 {% endblock %}

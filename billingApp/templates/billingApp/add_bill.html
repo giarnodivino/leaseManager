@@ -1,0 +1,66 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+
+</div>
+
+<div class="card2 card">
+  <div class="card-content">
+    <div class="columns is-justify-content-center p-4">
+      <div class="column is-4">
+        <h1 class="is-size-2 has-text-weight-bold pb-3">Bill Tenant</h1>
+        <p class="is-size-4 mb-3">Tenant Details:</p>
+        <p class="is-size-5 has-text-weight-normal">
+          Monthly Rent: ₱
+          <strong>{{ lease.rentAmount }}</strong>
+        </p>
+        <p class="is-size-5 has-text-weight-normal">
+          VAT Amount: ₱
+          <strong>{{ lease.vatAmount }}</strong>
+        </p>
+        <p class="is-size-5 has-text-weight-normal">
+          Parking Fees:
+          <strong>{{ lease.parkingFees }}</strong>
+        </p>
+        <p class="is-size-5 has-text-weight-normal">
+          Signage Fees:
+          <strong>{{ lease.signageFees }}</strong>
+        </p>
+        <p class="is-size-5 has-text-weight-normal">
+          Start Date:
+          <strong>{{ lease.contractStart }}</strong>
+        </p>
+        <p class="is-size-5 has-text-weight-normal">
+          End Date:
+          <strong>{{ lease.contractEnd }}</strong>
+        </p>
+        <p class="is-size-5 has-text-weight-normal">Building: {{ lease.buildingName }}</p>
+      </div>
+      <form method="POST" action="{% url 'add_bill' pk=tenant.pk %}">
+        {% csrf_token %}
+        <div class="column is-full-width">
+          <label for="billingFor">Select Billing Particular:</label>
+          <div class="select is-fullwidth mb-3">
+            <select id="billingFor" name="billingFor" required>
+              <option value="" disabled selected>Select an option</option>
+              <option value="RENT">Rent</option>
+              <option value="WATER">Water</option>
+              <option value="ELECTRICITY">Electricity</option>
+            </select>
+          </div>
+        </div>
+        <div class="column">
+          <label for="payable">Total Payable:</label>
+          <input type="number" class="input" id="payable" name="payable" step="0.01" required />
+        </div>
+        <div class="column">
+          <label for="dateIssued">Date Issued:</label>
+          <input type="date" class="input" id="dateIssued" name="dateIssued" required />
+        </div>
+        <div class="column">
+          <button type="submit" class="button is-primary">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

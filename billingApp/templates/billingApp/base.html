@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="{% static 'billingApp/css/style.css' %}" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css" />
-    <title>Billing Manager</title>
+    <title>J&F Billing Manager</title>
   </head>
   <body>
     <nav class="navbar p-5" role="navigation" aria-label="main navigation">
@@ -58,7 +58,7 @@
         <p class="menu-label">General</p>
         <ul class="menu-list">
           <li><a href="{% url 'home_page' %}">OVERVIEW</a></li>
-          <li><a>BILLING</a></li>
+          <li><a href="{% url 'billing_records_main' %}">BILLING</a></li>
           <li><a>PAYMENTS</a></li>
           <li><a href="{% url 'tenants_main' %}">TENANTS</a></li>
           <li><a href="{% url 'buildings_main' %}">BUILDING</a></li>
