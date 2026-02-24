@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Tenant, Building, Lease, BillingRecord
+from django.contrib import messages
 
 # Create your views here.
 def home_page(request):
@@ -69,34 +70,47 @@ def add_lease(request, pk):
     tenant_objects = Tenant.objects.all()
     building_objects = Building.objects.all()
 
-    if(request.method=="POST"):
-        building_id = request.POST.get('building_id')
-        tenant_id = tenant
-        unitID = request.POST.get('unitID')
-        rentAmount = request.POST.get('rentAmount')
-        contractLength = request.POST.get('contractLength')
-        contractStart = request.POST.get('contractStart')
-        pastLease = request.POST.get('pastLease')
-        signageFees = request.POST.get('signageFees')
-        parkingFees = request.POST.get('parkingFees')
+    # Block if tenant already has an active/current lease
+    if Lease.objects.filter(tenantName=tenant, pastLease=False).exists():
+        messages.error(request, "This tenant already has an active lease.")
+        return redirect("tenant_details", pk=tenant.pk)
 
+    if request.method == "POST":
+        building_id = request.POST.get("building_id")
+        unitID = request.POST.get("unitID")
+        rentAmount = request.POST.get("rentAmount")
+        contractLength = request.POST.get("contractLength")
+        contractStart = request.POST.get("contractStart")
+        signageFees = request.POST.get("signageFees")
+        parkingFees = request.POST.get("parkingFees")
+
+        # your conversions...
         rentAmount = float(rentAmount) if rentAmount else 0.0
         vatAmount = float(rentAmount * 0.12)
         signageFees = float(signageFees) if signageFees else None
         parkingFees = float(parkingFees) if parkingFees else None
         contractLength = int(contractLength) if contractLength else None
 
-        if not Lease.objects.filter(unitID=unitID).exists():
-            Lease.objects.create(buildingName_id=building_id, tenantName=tenant,
-                                 unitID=unitID, rentAmount=rentAmount, vatAmount=vatAmount,
-                                 contractLength=contractLength, contractStart=contractStart,
-                                 pastLease=pastLease,
-                                 signageFees=signageFees, parkingFees=parkingFees)
-        else:
-            return redirect('add_lease', pk=tenant.pk)
-        return redirect('tenant_details', pk=tenant.pk)
-    
-    return render(request, 'billingApp/add_lease.html', {'t':tenant, 'tenants':tenant_objects, 'buildings':building_objects})
+        # Double-check again before create (race-condition safe-ish)
+        if Lease.objects.filter(tenantName=tenant, pastLease=False).exists():
+            messages.error(request, "This tenant already has an active lease.")
+            return redirect("tenant_details", pk=tenant.pk)
+
+        Lease.objects.create(
+            buildingName_id=building_id,
+            tenantName=tenant,
+            unitID=unitID,
+            rentAmount=rentAmount,
+            vatAmount=vatAmount,
+            contractLength=contractLength,
+            contractStart=contractStart,
+            pastLease=False,
+            signageFees=signageFees,
+            parkingFees=parkingFees,
+        )
+        return redirect("tenant_details", pk=tenant.pk)
+
+    return render(request, "billingApp/add_lease.html", {"t": tenant, "tenants": tenant_objects, "buildings": building_objects})
 
 def delete_lease(request, pk):
     lease = get_object_or_404(Lease, pk=pk)
@@ -120,7 +134,7 @@ def billing_records_main(request):
 
 def view_bills(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
-    bills = BillingRecord.objects.filter(tenant=tenant).order_by("-dateIssued")
+    bills = BillingRecord.objects.filter(tenant=tenant).order_by("-id")
     return render(request, 'billingApp/view_bills.html', {"tenant": tenant, "bills": bills})
 
 def add_bill(request, pk):

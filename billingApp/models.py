@@ -3,6 +3,7 @@ from datetime import timedelta, date
 from django.conf import settings
 from django.utils import timezone
 from decimal import Decimal
+from django.db.models import Q
 
 # Create your models here.
 class Building(models.Model):
@@ -34,34 +35,22 @@ class Lease(models.Model):
     vatAmount = models.DecimalField(max_digits=12, decimal_places=2)
     signageFees = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     parkingFees = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    
-    CONTRACT_CHOICES = [
-        (6, "6 months"),
-        (12, "12 months"),
-    ]
 
+    CONTRACT_CHOICES = [(6, "6 months"), (12, "12 months")]
     contractLength = models.PositiveSmallIntegerField(choices=CONTRACT_CHOICES)
     contractStart = models.DateField()
     contractEnd = models.DateField(null=True, blank=True)
 
-    pastLease = models.BooleanField(default=True, blank=True, null=True)
+    pastLease = models.BooleanField(default=False)  
 
-    def save(self, *args, **kwargs):
-        if self.contractStart and self.contractLength:
-            if isinstance(self.contractStart, str):
-                self.contractStart = date.fromisoformat(self.contractStart)
-
-            length = int(self.contractLength)
-
-            if length == 12:
-                self.contractEnd = self.contractStart + timedelta(days=365)
-            elif length == 6:
-                self.contractEnd = self.contractStart + timedelta(days=182)
-
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.tenantName} - {self.buildingName} (Unit {self.unitID})"
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenantName"],
+                condition=Q(pastLease=False),
+                name="unique_active_lease_per_tenant",
+            ),
+        ]
     
 class BillingRecord(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
