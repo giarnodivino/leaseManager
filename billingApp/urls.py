@@ -19,4 +19,5 @@ urlpatterns = [
     path('add_bill/<int:pk>/', views.add_bill, name='add_bill'),
     path('register_admin/', views.register_admin, name='register_admin'),
     path('logout/', views.logout_view, name='logout'),
+    path('add_unit/', views.add_units, name='add_unit'),
 ]

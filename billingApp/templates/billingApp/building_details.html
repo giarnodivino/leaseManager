@@ -10,12 +10,17 @@
         <p class="is-size-5 p-2">Parking Capacity: <strong>{{ b.parkingCapacity }}</strong> Slots</p>
         <p class="is-size-5 p-2">Signage Capacity: <strong>{{ b.signageCapacity }}</strong> Slots</p>
         <p class="is-size-5 p-2">Building Address: <strong>{{ b.buildingAddress }}</strong></p>
+        <p class="is-size-5 p-2">Modified By: <strong>{{ b.modified_by }}</strong></p>
+        <p class="is-size-5 p-2">Last Modified: <strong>{{ b.modified_at }}</strong></p>
         <div class="columns is-justify-content-center p-4">
             <div class="column is-3">
                 <a href="" class="button">Edit Building Details</a>
             </div>
             <div class="column is-3">
                 <a href="{% url 'delete_building' pk=b.pk %}" class="button is-danger">DELETE BUILDING</a>
+            </div>
+            <div class="column is-3">
+                <a href="{% url 'add_unit' %}" class="button is-primary">ADD UNIT</a>
             </div>
         </div>
     </div>

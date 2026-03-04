@@ -12,16 +12,32 @@ class Building(models.Model):
     signageCapacity = models.IntegerField(default=0)
     parkingCapacity = models.IntegerField(default=0)
     buildingAddress = models.CharField(max_length=200)
+    modified_by = models.ForeignKey("Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    modified_at = models.DateTimeField(auto_now=True, null=True, blank=True)
     objects = models.Manager
 
     def __str__(self):
         return str(self.buildingName)
+    
+class Units(models.Model):
+    building = models.ForeignKey(Building, on_delete=models.CASCADE)
+    unitID = models.IntegerField()
+    modified_by = models.ForeignKey("Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    modified_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        unique_together = ('building', 'unitID')
+
+    def __str__(self):
+        return f"{self.building.buildingName} - Unit {self.unitID}"
 
 class Tenant(models.Model):
-    companyName = models.CharField(max_length=100)
+    companyName = models.CharField(max_length=100, null=True, blank=True)
     contactPerson = models.CharField(max_length=100)
     phoneNumber = models.CharField(max_length=12)
     email = models.CharField(max_length=50)
+    modified_by = models.ForeignKey("Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    modified_at = models.DateTimeField(auto_now=True, null=True, blank=True)
     objects = models.Manager
     
     def __str__(self):
@@ -30,7 +46,9 @@ class Tenant(models.Model):
 class Lease(models.Model):
     buildingName = models.ForeignKey(Building, on_delete=models.CASCADE)
     tenantName = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-    unitID = models.IntegerField()
+    modified_by = models.ForeignKey("Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    modified_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+    unitID = models.ForeignKey(Units, on_delete=models.CASCADE)
     rentAmount = models.DecimalField(max_digits=12, decimal_places=2)
     vatAmount = models.DecimalField(max_digits=12, decimal_places=2)
     signageFees = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
@@ -55,6 +73,8 @@ class Lease(models.Model):
 class BillingRecord(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     lease = models.ForeignKey(Lease, on_delete=models.CASCADE)
+    modified_by = models.ForeignKey("Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    modified_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     dateIssued = models.DateField()
     dateDue = models.DateField(null=True, blank=True)
@@ -127,4 +147,4 @@ class Account(models.Model):
         return self.password
     
     def __str__(self):
-        return str(self.pk) + ": " + self.username
+        return self.username
