@@ -63,4 +63,36 @@
   </div>
 </div>
 
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const billingForSelect = document.getElementById("billingFor");
+    const payableInput = document.getElementById("payable");
+    const rentAmount = "{{ lease.rentAmount|default_if_none:'0.00' }}";
+    let manualPayableValue = payableInput.value;
+
+    function togglePayableState() {
+      const isRent = (billingForSelect.value || "").toUpperCase() === "RENT";
+
+      if (isRent) {
+        manualPayableValue = payableInput.value;
+        payableInput.value = rentAmount;
+        payableInput.disabled = true;
+        return;
+      }
+
+      payableInput.disabled = false;
+      payableInput.value = manualPayableValue;
+    }
+
+    billingForSelect.addEventListener("change", togglePayableState);
+    payableInput.addEventListener("input", function () {
+      if (!payableInput.disabled) {
+        manualPayableValue = payableInput.value;
+      }
+    });
+
+    togglePayableState();
+  });
+</script>
+
 {% endblock %}

@@ -112,3 +112,19 @@ class BillingRecord(models.Model):
 
     def __str__(self):
         return f"{self.billing_number()}: Bill for {self.tenant}"
+
+class Account(models.Model):
+    firstName = models.CharField(max_length=30)
+    lastName = models.CharField(max_length=30)
+    username = models.CharField(max_length=20)
+    password = models.CharField(max_length=20)
+    objects = models.Manager()
+
+    def getUsername(self):
+        return self.username
+    
+    def getPassword(self):
+        return self.password
+    
+    def __str__(self):
+        return str(self.pk) + ": " + self.username

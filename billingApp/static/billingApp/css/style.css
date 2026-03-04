@@ -35,3 +35,17 @@
 thead {
   background-color: #fafafa !important;
 }
+
+.logincard {
+  width: 500px !important;
+  background-color: #f8f8f8 !important;
+  min-height: 500px;
+}
+
+.secondary-text {
+  color: #808080 !important;
+}
+
+.sign-up-button {
+  background-color: #79c377 !important;
+}

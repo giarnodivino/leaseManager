@@ -92,7 +92,14 @@
         </table>
       </div>
     </div>
-
-    {% endblock %}
+    <div class="message is-danger">
+      {% if messages %}
+      <ul class="messages message-header">
+        {% for message in messages %}
+        <li {% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %} {% endblock %}
+    </div>
   </div>
 </div>
