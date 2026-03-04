@@ -20,7 +20,7 @@
 
 .card2 {
   background-color: #f4f4f4 !important;
-  min-height: 500px !important;
+  max-height: 600px !important;
 }
 
 .card1 {
@@ -48,4 +48,36 @@ thead {
 
 .sign-up-button {
   background-color: #79c377 !important;
+}
+
+.tenant-panel {
+  height: calc(100vh - 220px);
+}
+
+.tenant-panel-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.tenant-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.building-panel {
+  height: calc(100vh - 220px);
+}
+
+.building-panel-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.building-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 8px;
 }

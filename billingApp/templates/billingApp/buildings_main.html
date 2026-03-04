@@ -26,34 +26,45 @@
 </div>
 </div>
 
-<div class="card card2">
-    <div class="card-content">
+<div class="columns">
+  <div class="column">
+    <div class="card card2 building-panel">
+      <div class="card-content building-panel-content">
+
         <h1 class="is-size-3 has-text-weight-bold">Building Management</h1>
-        <div class="columns is-justify-content-center mt-3">
-            <div class="column">
-                {% for b in buildings %}
-                <div class="card">
-                    <div class="card-content">
-                        <div class="columns">
-                            <div class="column">
-                                <h2 class="is-size-4 has-text-weight-semibold mb-4">{{ b.buildingName}}</h2>
-                                <h3 class="is-size-4 has-text-weight-semibold">{{ b.roomCapacity }}<span class="is-size-6 has-text-weight-normal p-3">Available Units</span></h3>
-                                <h3 class="is-size-4 has-text-weight-semibold">{{ b.parkingCapacity }}<span class="is-size-6 has-text-weight-normal p-3">Available Parking Slots</span></h3>
-                            </div>
-                            <div class="column is-2">
-                                <a href="{% url 'building_details' b.id %}" class="button">EDIT DETAILS</a>
-                                <p class="is-size-7 m-auto pt-4">{{ b.buildingAddress }}</p>
-                            </div>
-                        </div>
-                    </div>
+
+        <div class="building-list-scroll mt-4">
+          {% for b in buildings %}
+          <div class="card mb-4">
+            <div class="card-content">
+              <div class="columns is-vcentered is-multiline">
+                <div class="column">
+                  <h2 class="is-size-4 has-text-weight-semibold mb-4">{{ b.buildingName }}</h2>
+
+                  <h3 class="is-size-4 has-text-weight-semibold">
+                    {{ b.roomCapacity }}
+                    <span class="is-size-6 has-text-weight-normal p-3">Available Units</span>
+                  </h3>
+
+                  <h3 class="is-size-4 has-text-weight-semibold">
+                    {{ b.parkingCapacity }}
+                    <span class="is-size-6 has-text-weight-normal p-3">Available Parking Slots</span>
+                  </h3>
                 </div>
-                {% endfor %}
+
+                <div class="column is-3 has-text-right">
+                  <a href="{% url 'building_details' b.id %}" class="button">EDIT DETAILS</a>
+                  <p class="is-size-7 pt-4">{{ b.buildingAddress }}</p>
+                </div>
+              </div>
             </div>
+          </div>
+          {% endfor %}
         </div>
-        </div>
-        </div>
+
+      </div>
     </div>
-    </div>
+  </div>
 </div>
 
 {% endblock %}

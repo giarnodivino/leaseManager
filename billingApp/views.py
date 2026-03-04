@@ -60,7 +60,15 @@ def buildings_main(request):
 @login_required
 def tenants_main(request):
     tenant_objects = Tenant.objects.all().order_by('companyName')
-    return render(request, 'billingApp/tenants_main.html', {'tenants':tenant_objects})
+
+    for t in tenant_objects:
+        if not (t.companyName or "").strip():
+            t.companyName_display = t.contactPerson
+
+        else:
+            t.companyName_display = t.companyName
+
+    return render(request, 'billingApp/tenants_main.html', {'tenants': tenant_objects})
 
 @login_required
 def add_building(request):
@@ -125,7 +133,6 @@ def add_lease(request, pk):
     tenant_objects = Tenant.objects.all()
     building_objects = Building.objects.all()
 
-    # Block if tenant already has an active/current lease
     if Lease.objects.filter(tenantName=tenant, pastLease=False).exists():
         messages.error(request, "This tenant already has an active lease.")
         return redirect("tenant_details", pk=tenant.pk)
@@ -139,14 +146,19 @@ def add_lease(request, pk):
         signageFees = request.POST.get("signageFees")
         parkingFees = request.POST.get("parkingFees")
 
-        # your conversions...
         rentAmount = float(rentAmount) if rentAmount else 0.0
         vatAmount = float(rentAmount * 0.12)
         signageFees = float(signageFees) if signageFees else None
         parkingFees = float(parkingFees) if parkingFees else None
         contractLength = int(contractLength) if contractLength else None
 
-        # Double-check again before create (race-condition safe-ish)
+        if contractStart and contractLength:
+            from datetime import datetime, timedelta
+            contractStartDate = datetime.strptime(contractStart, "%Y-%m-%d").date()
+            contractEndDate = contractStartDate + timedelta(days=contractLength*30)
+        else:            
+            contractEndDate = None
+
         if Lease.objects.filter(tenantName=tenant, pastLease=False).exists():
             messages.error(request, "This tenant already has an active lease.")
             return redirect("tenant_details", pk=tenant.pk)
@@ -159,6 +171,7 @@ def add_lease(request, pk):
             vatAmount=vatAmount,
             contractLength=contractLength,
             contractStart=contractStart,
+            contractEnd=contractEndDate,
             pastLease=False,
             signageFees=signageFees,
             parkingFees=parkingFees,
@@ -181,6 +194,14 @@ def delete_lease(request, pk):
 def billing_records_main(request):
     tenants = Tenant.objects.all().order_by('companyName')
     leases = Lease.objects.all()
+
+    for t in tenants:
+        if not (t.companyName or "").strip():
+            t.companyName_display = t.contactPerson
+
+        else:
+            t.companyName_display = t.companyName
+
     return render(
         request,
         'billingApp/billing_records_main.html',
@@ -191,6 +212,11 @@ def billing_records_main(request):
 def view_bills(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
     bills = BillingRecord.objects.filter(tenant=tenant).order_by("-id")
+
+    if not (tenant.companyName or "").strip():
+        tenant.companyName_display = tenant.contactPerson
+    else:
+        tenant.companyName_display = tenant.companyName
     return render(request, 'billingApp/view_bills.html', {"tenant": tenant, "bills": bills})
 
 @login_required

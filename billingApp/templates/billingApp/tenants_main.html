@@ -28,47 +28,63 @@
 
 <div class="columns">
   <div class="column">
-    <div class="card card2">
-      <div class="card-content">
-        <div class="columns">
+    <div class="card card2 tenant-panel">
+      <div class="card-content tenant-panel-content">
+
+        <div class="columns is-vcentered">
           <div class="column">
             <a href="#" class="button">Filter</a>
           </div>
           <div class="column">
             <h1 class="is-size-4 has-text-weight-bold has-text-centered">TENANT LIST</h1>
           </div>
-          <div class="column mt-3 has-text-right">
-            <p>search bar here</p>
+          <div class="column has-text-right">
+            <input id="searchInput" type="text" class="input" placeholder="Search Tenants..." />
           </div>
         </div>
-        <div class="columns">
-          <div class="column">
-            {% for t in tenants %}
-            <div class="card">
-              <div class="card-content">
-                <div class="columns is-multiline">
-                
-                  <div class="column">
-                    <h2 class="is-size-5 has-text-weight-semibold mb-1">{{t.companyName}}</h2>
-                    <p class="is-size-6 has-text-weight-normal">Contact Person: <strong>{{t.contactPerson}}</strong></p>
-                    <p class="is-size-6 has-text-weight-normal">Contact Number: <strong>{{t.phoneNumber}}</strong></p>
 
-                  </div>
-                
-                  <div class="column is-2">
-                    <a href="{% url 'tenant_details' t.id %}" class="button">VIEW DETAILS</a>
-                  </div>
-                  
+        <div class="tenant-list-scroll">
+          {% for t in tenants %}
+          <div class="card mb-4">
+            <div class="card-content">
+              <div class="columns is-multiline is-vcentered">
+                <div class="column">
+                  <h2 class="is-size-5 has-text-weight-semibold mb-1">{{ t.companyName_display }}</h2>
+                  <p class="is-size-6">Contact Person: <strong>{{ t.contactPerson }}</strong></p>
+                  <p class="is-size-6">Contact Number: <strong>{{ t.phoneNumber }}</strong></p>
+                </div>
+
+                <div class="column is-2 has-text-right">
+                  <a href="{% url 'tenant_details' t.id %}" class="button">VIEW DETAILS</a>
                 </div>
               </div>
             </div>
-            {% endfor %}
           </div>
+          {% endfor %}
         </div>
+
       </div>
     </div>
   </div>
 </div>
 
+<script>
+  document.getElementById('searchInput').addEventListener('input', function() {
+    const searchTerm = this.value.toLowerCase();
+    const tenantCards = document.querySelectorAll('.tenant-list-scroll .card');
+
+    tenantCards.forEach(card => {
+      const companyName = card.querySelector('.is-size-5').textContent.toLowerCase();
+      const contactPerson = card.querySelector('.is-size-6 strong').textContent.toLowerCase();
+      const contactNumber = card.querySelectorAll('.is-size-6 strong')[1].textContent.toLowerCase();
+
+      if (companyName.includes(searchTerm) || contactPerson.includes(searchTerm) || contactNumber.includes(searchTerm)) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
+</script>
 
 {% endblock %}
