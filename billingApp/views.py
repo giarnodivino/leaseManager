@@ -4,12 +4,31 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from decimal import Decimal
 
 
 def get_available_units(building_id):
     leased_units = Lease.objects.filter(buildingName_id=building_id, pastLease=False).values_list("unitID_id", flat=True)
     available_units = Units.objects.filter(building_id=building_id).exclude(pk__in=leased_units)
     return available_units
+
+def calculate_total_outstanding():
+    total_outstanding = Decimal("0.00")
+    billing_records = BillingRecord.objects.all()
+    for record in billing_records:
+        total_outstanding += record.amountDue or Decimal("0.00")
+    return f"{total_outstanding:,.2f}"
+
+def calculate_total_revenue():
+    total_revenue = Decimal("0.00")
+    lease_records = Lease.objects.filter(pastLease=False)
+    for lease in lease_records:
+        total_revenue += (
+            (lease.rentAmount or Decimal("0.00"))
+            + (lease.signageFees or Decimal("0.00"))
+            + (lease.parkingFees or Decimal("0.00"))
+        )
+    return f"{total_revenue:,.2f}"
 
 def get_logged_in_account(request):
     if not request.user.is_authenticated:
@@ -79,7 +98,9 @@ def logout_view(request):
 
 @login_required
 def home_page(request):
-    return render(request, 'billingApp/home_page.html')
+    total_outstanding_balance = calculate_total_outstanding()
+    total_revenue = calculate_total_revenue()
+    return render(request, 'billingApp/home_page.html', {'total_outstanding': total_outstanding_balance, 'total_revenue': total_revenue})
 
 @login_required
 def buildings_main(request):
@@ -373,8 +394,6 @@ def add_units(request, pk):
     if request.method == "POST":
         building_id = building_details.pk
         unit_number = request.POST.get("unit_number")
-
-        # if building_id and unit number arent the same as an existing unit, create the new unit. Otherwise, show an error message.
         
         if building_id and unit_number:
             existing_unit = Units.objects.filter(building_id=building_id, unitID=unit_number).first()
@@ -391,7 +410,7 @@ def add_units(request, pk):
     buildings = Building.objects.all()
     return render(request, "billingApp/add_unit.html", {"buildings": buildings, "building": building_details})
 
-# view unit per building, ordered by building name and unit number. Show building name, unit number, and unit id.
+
 @login_required
 def view_units(request, pk):
     building = get_object_or_404(Building, pk=pk)
