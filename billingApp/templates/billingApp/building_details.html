@@ -20,7 +20,7 @@
                 <a href="{% url 'delete_building' pk=b.pk %}" class="button is-danger">DELETE BUILDING</a>
             </div>
             <div class="column is-3">
-                <a href="{% url 'add_unit' %}" class="button is-primary">ADD UNIT</a>
+                <a href="{% url 'add_unit' pk=b.pk %}" class="button is-primary">ADD UNIT</a>
             </div>
             <div class="column is-3">
                 <a href="{% url 'view_units' pk=b.pk %}" class="button is-link">VIEW UNITS</a>

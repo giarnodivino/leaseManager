@@ -19,6 +19,6 @@ urlpatterns = [
     path('add_bill/<int:pk>/', views.add_bill, name='add_bill'),
     path('register_admin/', views.register_admin, name='register_admin'),
     path('logout/', views.logout_view, name='logout'),
-    path('add_unit/', views.add_units, name='add_unit'),
+    path('add_unit/<int:pk>/', views.add_units, name='add_unit'),
     path('view_units/<int:pk>/', views.view_units, name='view_units'),
 ]

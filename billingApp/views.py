@@ -368,9 +368,10 @@ def add_bill(request, pk):
     return render(request, "billingApp/add_bill.html", {"tenant": tenant, "lease": lease})
 
 @login_required
-def add_units(request):
+def add_units(request, pk):
+    building_details = get_object_or_404(Building, pk=pk)
     if request.method == "POST":
-        building_id = request.POST.get("building_id")
+        building_id = building_details.pk
         unit_number = request.POST.get("unit_number")
 
         # if building_id and unit number arent the same as an existing unit, create the new unit. Otherwise, show an error message.
@@ -379,16 +380,16 @@ def add_units(request):
             existing_unit = Units.objects.filter(building_id=building_id, unitID=unit_number).first()
             if existing_unit:
                 messages.error(request, "This unit already exists.")
-                return redirect("add_unit")
+                return redirect("add_unit", pk=building_id)
             Units.objects.create(building_id=building_id, unitID=unit_number)
             messages.add_message(request, messages.SUCCESS, "Unit added successfully.")
-            return redirect("add_unit")
+            return redirect("add_unit", pk=building_id)
         else:
             messages.error(request, "Please provide both building and unit number.")
-            return redirect("add_unit")
+            return redirect("add_unit", pk=building_id)
 
     buildings = Building.objects.all()
-    return render(request, "billingApp/add_unit.html", {"buildings": buildings})
+    return render(request, "billingApp/add_unit.html", {"buildings": buildings, "building": building_details})
 
 # view unit per building, ordered by building name and unit number. Show building name, unit number, and unit id.
 @login_required

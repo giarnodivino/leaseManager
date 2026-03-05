@@ -3,21 +3,10 @@
 
 <div class="card card2">
     <div class="card-content has-text-centered">
-        <h1 class="is-size-3 has-text-weight-bold p-5 mt-6">Add Unit</h1>
-        <form method="POST" action="{% url 'add_unit' %}">
+        <h1 class="is-size-3 p-5 mt-6">Add Units for <strong>{{ building.buildingName }}</strong></h1>
+        <form method="POST" action="{% url 'add_unit' pk=building.pk %}">
             {% csrf_token %}
             <div class="columns is-justify-content-center p-4">
-                <div class="column is-3">
-                    <label for="building_id">Select Building:</label>
-                    <div class="select is-fullwidth mb-3">
-                        <select id="building_id" name="building_id" required>
-                            <option value="" disabled selected>Select a building</option>
-                            {% for b in buildings %}
-                            <option value="{{ b.id }}">{{ b.buildingName }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
                 <div class="column is-3">
                     <label for="unit_number">Unit Number:</label>
                     <input type="text" class="input" id="unit_number" name="unit_number" placeholder="Unit / Room Number" required />
