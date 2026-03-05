@@ -35,10 +35,7 @@
           <div class="column">
             <a href="#" class="button">Filter</a>
           </div>
-          <div class="column">
-            <h1 class="is-size-4 has-text-weight-bold has-text-centered">TENANT LIST</h1>
-          </div>
-          <div class="column has-text-right">
+          <div class="column has-text-right is-3">
             <input id="searchInput" type="text" class="input searchInput" placeholder="Search Tenants..." />
           </div>
         </div>
@@ -55,7 +52,7 @@
                 </div>
 
                 <div class="column is-2 has-text-right">
-                  <a href="{% url 'tenant_details' t.id %}" class="button">VIEW DETAILS</a>
+                  <a href="{% url 'view_payments' t.id %}" class="button">VIEW PAYMENTS</a>
                 </div>
               </div>
             </div>

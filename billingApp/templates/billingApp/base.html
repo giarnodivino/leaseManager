@@ -69,7 +69,7 @@
         <ul class="menu-list">
           <li><a href="{% url 'home_page' %}">OVERVIEW</a></li>
           <li><a href="{% url 'billing_records_main' %}">BILLING</a></li>
-          <li><a>PAYMENTS</a></li>
+          <li><a href="{% url 'payments_main' %}">PAYMENTS</a></li>
           <li><a href="{% url 'tenants_main' %}">TENANTS</a></li>
           <li><a href="{% url 'buildings_main' %}">BUILDING</a></li>
         </ul>
@@ -104,7 +104,7 @@
               </svg>
             </div>
             <div class="column">
-              <h1 class="is-size-3 pt-4 pl-4">DATE TODAY</h1>
+              <h1 class="is-size-3 pt-4 pl-4">{{ date_today }}</h1>
             </div>
 
     {% endblock %} {% block content %} {% endblock %}

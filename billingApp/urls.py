@@ -21,4 +21,8 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('add_unit/<int:pk>/', views.add_units, name='add_unit'),
     path('view_units/<int:pk>/', views.view_units, name='view_units'),
+    path('payments_main/', views.payments_main, name='payments_main'),
+    path('view_payments/<int:pk>/', views.view_payments, name='view_payments'),
+    path('soa/<int:pk>/', views.soa, name='soa'),
+    path('add_payment/<int:pk>/', views.add_payment, name='add_payment'),
 ]

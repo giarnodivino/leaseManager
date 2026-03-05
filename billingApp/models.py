@@ -68,6 +68,9 @@ class Lease(models.Model):
                 name="unique_active_lease_per_tenant",
             ),
         ]
+
+    def __str__(self):
+        return f"Lease of {self.tenantName} at {self.buildingName}"
     
 class BillingRecord(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
@@ -130,7 +133,7 @@ class BillingRecord(models.Model):
             return f"BL-{self.pk:06d}"
 
     def __str__(self):
-        return f"{self.billing_number()}: Bill for {self.tenant}"
+        return f"Billing Record {self.billing_number()} for {self.tenant}"
 
 class Account(models.Model):
     firstName = models.CharField(max_length=30)
@@ -147,3 +150,25 @@ class Account(models.Model):
     
     def __str__(self):
         return self.username
+    
+class Payment(models.Model):
+
+    paymentMethodChoices = [
+        ('CASH', 'Cash'),
+        ('BANK_TRANSFER', 'Bank Transfer'),
+        ('PDC', 'PDC'),]
+
+    billingID = models.ForeignKey(BillingRecord, on_delete=models.CASCADE)
+    tenantID = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    modified_by = models.ForeignKey("Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    modified_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+    datePaid = models.DateField()
+    referenceNumber = models.CharField(max_length=50)
+    verificationStatus = models.BooleanField(default=False)
+    amountPaid = models.DecimalField(max_digits=12, decimal_places=2)
+    subAccountName = models.CharField(max_length=50, null=True, blank=True)
+    proofOfPayment = models.FileField(upload_to='proof_of_payment/', null=True, blank=True)
+    paymentMethod = models.CharField(max_length=20, choices=paymentMethodChoices, null=True, blank=True)
+
+    def __str__(self):
+        return f"Payment of {self.amountPaid} for {self.billingID}"

@@ -84,12 +84,17 @@
               <td>{{ b.billingFor }}</td>
               <td>₱ {{ b.amountDue }}</td>
               <td>₱ {{ b.balance }}</td>
-              <td><a href="" class="button is-small">Edit Bill</a></td>
-              <td><a href="" class="button is-small">View Payment</a></td>
+              <td><a href="" class="button is-small" style="background-color: #f7f2ed">Edit Bill</a></td>
+              <td><a href="" class="button is-small" style="background-color: #f7f2ed">View Payment</a></td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
+      </div>
+    </div>
+    <div class="columns">
+      <div class="column has-text-right">
+        <a href="{% url 'soa' pk=tenant.id %}" class="button" style="background-color: #f7f2ed">Generate SOA</a>
       </div>
     </div>
     <div class="message is-danger">

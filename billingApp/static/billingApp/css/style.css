@@ -21,6 +21,7 @@
 .card2 {
   background-color: #f4f4f4 !important;
   max-height: 600px !important;
+  min-height: 500px !important;
 }
 
 .card1 {
@@ -80,4 +81,8 @@ thead {
   flex: 1;
   overflow-y: auto;
   padding-right: 8px;
+}
+
+.searchInput {
+  border-radius: 30px !important;
 }
