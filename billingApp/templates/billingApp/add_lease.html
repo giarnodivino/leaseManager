@@ -5,6 +5,15 @@
 <div class="card card2">
   <div class="card-content">
     <h1 class="is-size-3 has-text-weight-bold has-text-centered">Add Lease</h1>
+    {% if messages %}
+    <div class="message is-danger mb-4">
+      <div class="message-body">
+        {% for message in messages %}
+        <p{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
     <form method="POST" action="{% url 'add_lease' pk=t.id %}">
       {% csrf_token %}
       <div class="columns is-justify-content-center p-4">

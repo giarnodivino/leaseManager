@@ -6,6 +6,11 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 
 
+def get_available_units(building_id):
+    leased_units = Lease.objects.filter(buildingName_id=building_id, pastLease=False).values_list("unitID_id", flat=True)
+    available_units = Units.objects.filter(building_id=building_id).exclude(pk__in=leased_units)
+    return available_units
+
 def get_logged_in_account(request):
     if not request.user.is_authenticated:
         return None
@@ -78,7 +83,11 @@ def home_page(request):
 
 @login_required
 def buildings_main(request):
-    building_objects = Building.objects.all()
+    building_objects = Building.objects.all().order_by('buildingName')
+
+    for b in building_objects:
+        b.unit_count = Units.objects.filter(building_id=b.pk).count()
+        b.available_units = get_available_units(b.pk).count()
     return render(request, 'billingApp/buildings_main.html', {'buildings':building_objects})
 
 @login_required
@@ -99,13 +108,12 @@ def add_building(request):
     if(request.method=="POST"):
         buildingName = request.POST.get('buildingName')
         buildingAddress = request.POST.get('buildingAddress')
-        roomCapacity = request.POST.get('roomCapacity')
         signageCapacity = request.POST.get('signageCapacity')
         parkingCapacity = request.POST.get('parkingCapacity')
         admin_account = get_logged_in_account(request)
         if not Building.objects.filter(buildingName=buildingName).exists():
             Building.objects.create(buildingName=buildingName, buildingAddress=buildingAddress, 
-                                    roomCapacity=roomCapacity, signageCapacity=signageCapacity, 
+                                    signageCapacity=signageCapacity, 
                                     parkingCapacity=parkingCapacity,
                                     modified_by=admin_account)
         else:
@@ -117,6 +125,8 @@ def add_building(request):
 @login_required
 def building_details(request, pk):
     building = get_object_or_404(Building, pk=pk)
+
+    building.unit_count = Units.objects.filter(building_id=building.pk).count()
 
     return render(request, 'billingApp/building_details.html', {'b':building})
 
@@ -165,12 +175,18 @@ def delete_tenant(request, pk):
     Tenant.objects.filter(pk=pk).delete()
     return redirect('tenants_main')
 
+
 @login_required
 def add_lease(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
     tenant_objects = Tenant.objects.all()
     building_objects = Building.objects.all().order_by("buildingName")
-    units = Units.objects.select_related("building").order_by("building__buildingName", "unitID")
+    active_leased_unit_ids = Lease.objects.filter(pastLease=False).values_list("unitID_id", flat=True)
+    units = (
+        Units.objects.select_related("building")
+        .exclude(pk__in=active_leased_unit_ids)
+        .order_by("building__buildingName", "unitID")
+    )
     units_payload = [
         {
             "id": unit.id,
@@ -220,6 +236,21 @@ def add_lease(request, pk):
 
         if not selected_building or not selected_unit:
             messages.error(request, "Selected unit does not belong to the chosen building.")
+            return redirect("add_lease", pk=tenant.pk)
+
+        occupied_lease = Lease.objects.filter(
+            buildingName=selected_building,
+            unitID=selected_unit,
+            pastLease=False,
+        ).first()
+
+        if occupied_lease:
+            occupied_tenant = occupied_lease.tenantName
+            occupied_tenant_name = (occupied_tenant.companyName or "").strip() or occupied_tenant.contactPerson
+            messages.error(
+                request,
+                f"Unit {selected_unit.unitID} in {selected_building.buildingName} is already taken by {occupied_tenant_name}.",
+            )
             return redirect("add_lease", pk=tenant.pk)
 
         Lease.objects.create(
@@ -358,3 +389,10 @@ def add_units(request):
 
     buildings = Building.objects.all()
     return render(request, "billingApp/add_unit.html", {"buildings": buildings})
+
+# view unit per building, ordered by building name and unit number. Show building name, unit number, and unit id.
+@login_required
+def view_units(request, pk):
+    building = get_object_or_404(Building, pk=pk)
+    units = Units.objects.filter(building=building).order_by("unitID")
+    return render(request, "billingApp/view_units.html", {"building": building, "units": units})

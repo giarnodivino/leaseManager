@@ -8,7 +8,6 @@ from django.db.models import Q
 # Create your models here.
 class Building(models.Model):
     buildingName = models.CharField(max_length=100, unique=True)
-    roomCapacity = models.IntegerField()
     signageCapacity = models.IntegerField(default=0)
     parkingCapacity = models.IntegerField(default=0)
     buildingAddress = models.CharField(max_length=200)
