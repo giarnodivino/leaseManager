@@ -26,6 +26,7 @@
 </div>
 </div>
 
+
 <div class="columns">
   <div class="column">
     <div class="card card2 tenant-panel">
@@ -33,10 +34,58 @@
 
         <div class="columns is-vcentered">
           <div class="column">
-            <a href="#" class="button">Filter</a>
+            <div class="dropdown" id="filterDropdown">
+              <div class="dropdown-trigger">
+                <button class="button" onclick="toggleFilter()" type="button">
+                  Filter
+                </button>
+              </div>
+
+              <div class="dropdown-menu">
+                <div class="dropdown-content p-4" style="min-width:250px">
+
+                  <form method="GET">
+
+                    <div class="field">
+                      <label class="label">Building</label>
+                      <div class="select is-fullwidth">
+                        <select name="building">
+                          <option value="">All Buildings</option>
+
+                          {% for b in buildings %}
+                          <option value="{{ b.id }}" {% if selected_building == b.id|stringformat:"s" %}selected{% endif %}>
+                            {{ b.buildingName }}
+                          </option>
+                          {% endfor %}
+
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="field">
+                      <label class="label">Lease Status</label>
+                      <div class="select is-fullwidth">
+                        <select name="lease_status">
+                          <option value="">All</option>
+                          <option value="active" {% if selected_lease_status == "active" %} selected {% endif %}>Active Lease</option>
+                          <option value="none" {% if selected_lease_status == "none" %} selected {% endif %}>No Lease</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="buttons mt-3">
+                      <button type="submit" class="button is-link is-small">Apply</button>
+                      <a href="{% url 'tenants_main' %}" class="button is-light is-small">Clear</a>
+                    </div>
+
+                  </form>
+
+                </div>
+              </div>
+            </div>
           </div>
           <div class="column">
-            <h1 class="is-size-4 has-text-weight-bold has-text-centered">TENANT LIST</h1>
+            <h1 class="is-size-4 has-text-weight-bold has-text-centered">TENANT LIST (MAIN)</h1>
           </div>
           <div class="column has-text-right">
             <input id="searchInput" type="text" class="input searchInput" placeholder="Search Tenants..." />
@@ -52,6 +101,7 @@
                   <h2 class="is-size-5 has-text-weight-semibold mb-1">{{ t.companyName_display }}</h2>
                   <p class="is-size-6">Contact Person: <strong>{{ t.contactPerson }}</strong></p>
                   <p class="is-size-6">Contact Number: <strong>{{ t.phoneNumber }}</strong></p>
+                  <p class="is-size-6">Leasing in: <strong class="building-name">{{ t.buildingName_display }}</strong></p>
                 </div>
 
                 <div class="column is-2 has-text-right">
@@ -77,14 +127,19 @@
       const companyName = card.querySelector('.is-size-5').textContent.toLowerCase();
       const contactPerson = card.querySelector('.is-size-6 strong').textContent.toLowerCase();
       const contactNumber = card.querySelectorAll('.is-size-6 strong')[1].textContent.toLowerCase();
+      const buildingNameElement = card.querySelector('.building-name');
+      const buildingName = buildingNameElement ? buildingNameElement.textContent.toLowerCase() : '';
 
-      if (companyName.includes(searchTerm) || contactPerson.includes(searchTerm) || contactNumber.includes(searchTerm)) {
+      if (companyName.includes(searchTerm) || contactPerson.includes(searchTerm) || contactNumber.includes(searchTerm) || buildingName.includes(searchTerm)) {
         card.style.display = '';
       } else {
         card.style.display = 'none';
       }
     });
   });
+  function toggleFilter() {
+    document.getElementById("filterDropdown").classList.toggle("is-active");
+}
 </script>
 
 {% endblock %}

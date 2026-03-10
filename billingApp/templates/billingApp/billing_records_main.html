@@ -33,7 +33,55 @@
 
         <div class="columns is-vcentered">
           <div class="column">
-            <a href="#" class="button">Filter</a>
+            <div class="dropdown" id="filterDropdown">
+              <div class="dropdown-trigger">
+                <button class="button" onclick="toggleFilter()" type="button">
+                  Filter
+                </button>
+              </div>
+
+              <div class="dropdown-menu">
+                <div class="dropdown-content p-4" style="min-width:250px">
+
+                  <form method="GET">
+
+                    <div class="field">
+                      <label class="label">Building</label>
+                      <div class="select is-fullwidth">
+                        <select name="building">
+                          <option value="">All Buildings</option>
+
+                          {% for b in buildings %}
+                          <option value="{{ b.id }}" {% if selected_building == b.id|stringformat:"s" %}selected{% endif %}>
+                            {{ b.buildingName }}
+                          </option>
+                          {% endfor %}
+
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="field">
+                      <label class="label">Lease Status</label>
+                      <div class="select is-fullwidth">
+                        <select name="lease_status">
+                          <option value="">All</option>
+                          <option value="active" {% if selected_lease_status == "active" %} selected {% endif %}>Active Lease</option>
+                          <option value="none" {% if selected_lease_status == "none" %} selected {% endif %}>No Lease</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="buttons mt-3">
+                      <button type="submit" class="button is-link is-small">Apply</button>
+                      <a href="{% url 'tenants_main' %}" class="button is-light is-small">Clear</a>
+                    </div>
+
+                  </form>
+
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="column">
@@ -60,6 +108,10 @@
                   <p class="is-size-6 has-text-weight-normal">
                     Contact Number: <strong>{{ t.phoneNumber }}</strong>
                   </p>
+
+                  <p class="is-size-6 has-text-weight-normal">
+                    Leasing in: <strong class="building-name">{{ t.buildingName_display }}</strong>
+                  </p>
                 </div>
 
                 <div class="column is-2 has-text-right">
@@ -85,14 +137,20 @@
       const companyName = card.querySelector('.is-size-5').textContent.toLowerCase();
       const contactPerson = card.querySelector('.is-size-6 strong').textContent.toLowerCase();
       const contactNumber = card.querySelectorAll('.is-size-6 strong')[1].textContent.toLowerCase();
+      const buildingNameElement = card.querySelector('.building-name');
+      const buildingName = buildingNameElement ? buildingNameElement.textContent.toLowerCase() : '';
 
-      if (companyName.includes(searchTerm) || contactPerson.includes(searchTerm) || contactNumber.includes(searchTerm)) {
+      if (companyName.includes(searchTerm) || contactPerson.includes(searchTerm) || contactNumber.includes(searchTerm) || buildingName.includes(searchTerm)) {
         card.style.display = '';
       } else {
         card.style.display = 'none';
       }
     });
   });
+
+  function toggleFilter() {
+    document.getElementById("filterDropdown").classList.toggle("is-active");
+}
 </script>
 
 {% endblock %}

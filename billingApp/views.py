@@ -119,17 +119,58 @@ def buildings_main(request):
 
 @login_required
 def tenants_main(request):
+
+    building_filter = request.GET.get("building")
+    lease_status_filter = request.GET.get("lease_status")
+
     tenant_objects = Tenant.objects.all().order_by('companyName', 'contactPerson')
+    active_leases = Lease.objects.filter(pastLease=False).select_related('tenantName', 'buildingName')
+
+
+    if building_filter:
+        tenant_objects = tenant_objects.filter(
+            lease__buildingName_id=building_filter,
+            lease__pastLease=False
+        ).distinct()
+
+
+    if lease_status_filter == "active":
+        tenant_objects = tenant_objects.filter(lease__pastLease=False).distinct()
+
+    elif lease_status_filter == "none":
+        tenant_objects = tenant_objects.exclude(lease__pastLease=False).distinct()
+
+    lease_by_tenant_id = {lease.tenantName_id: lease for lease in active_leases}
 
     for t in tenant_objects:
+
         if not (t.companyName or "").strip():
             t.companyName_display = t.contactPerson
-
         else:
             t.companyName_display = t.companyName
 
+        active_lease = lease_by_tenant_id.get(t.id)
+
+        if active_lease:
+            t.buildingName_display = active_lease.buildingName.buildingName
+        else:
+            t.buildingName_display = "No active lease"
+
+    buildings = Building.objects.all()
+
     date_today = get_date_today()
-    return render(request, 'billingApp/tenants_main.html', {'tenants': tenant_objects, 'date_today': date_today})
+
+    return render(
+        request,
+        'billingApp/tenants_main.html',
+        {
+            'tenants': tenant_objects,
+            'date_today': date_today,
+            'buildings': buildings,
+            'selected_building': building_filter,
+            'selected_lease_status': lease_status_filter,
+        }
+    )
 
 @login_required
 def add_building(request):
@@ -322,21 +363,63 @@ def delete_lease(request, pk):
 
 @login_required
 def billing_records_main(request):
+
+    building_filter = request.GET.get("building")
+    lease_status_filter = request.GET.get("lease_status")
+
     tenants = Tenant.objects.all().order_by('companyName', 'contactPerson')
     leases = Lease.objects.all()
 
+    active_leases = Lease.objects.filter(
+        pastLease=False
+    ).select_related('tenantName', 'buildingName')
+
+
+    if building_filter:
+        tenants = tenants.filter(
+            lease__buildingName_id=building_filter,
+            lease__pastLease=False
+        ).distinct()
+
+
+    if lease_status_filter == "active":
+        tenants = tenants.filter(lease__pastLease=False).distinct()
+
+    elif lease_status_filter == "none":
+        tenants = tenants.exclude(lease__pastLease=False).distinct()
+
+
+    lease_by_tenant_id = {lease.tenantName_id: lease for lease in active_leases}
+
     for t in tenants:
+
         if not (t.companyName or "").strip():
             t.companyName_display = t.contactPerson
-
         else:
             t.companyName_display = t.companyName
 
+        lease = lease_by_tenant_id.get(t.id)
+
+        if lease:
+            t.buildingName_display = lease.buildingName.buildingName
+        else:
+            t.buildingName_display = "No active lease"
+
+    buildings = Building.objects.all()
+
     date_today = get_date_today()
+
     return render(
         request,
         'billingApp/billing_records_main.html',
-        {'tenants': tenants, 'leases': leases, 'date_today': date_today}
+        {
+            'tenants': tenants,
+            'leases': leases,
+            'buildings': buildings,
+            'selected_building': building_filter,
+            'selected_lease_status': lease_status_filter,
+            'date_today': date_today
+        }
     )
 
 @login_required
@@ -353,6 +436,10 @@ def view_bills(request, pk):
     for b in bills:
         if b.status == BillingRecord.STATUS_PAID:
             b.balance = Decimal("0.00")
+        elif b.status == BillingRecord.STATUS_UNPAID:
+            b.balance = b.amountDue or Decimal("0.00")
+        elif b.status == BillingRecord.STATUS_PARTIAL:
+            b.balance = b.balance or (b.amountDue or Decimal("0.00"))
 
 
     for payment in payments:
@@ -451,19 +538,53 @@ def view_units(request, pk):
 
 @login_required
 def payments_main(request):
+    building_filter = request.GET.get("building")
+    lease_status_filter = request.GET.get("lease_status")
+
     tenants = Tenant.objects.all().order_by('companyName', 'contactPerson')
     leases = Lease.objects.all()
+    active_leases = Lease.objects.filter(pastLease=False).select_related('tenantName', 'buildingName')
+
+
+    if building_filter:
+        tenants = tenants.filter(
+            lease__buildingName_id=building_filter,
+            lease__pastLease=False
+        ).distinct()
+
+
+    if lease_status_filter == "active":
+        tenants = tenants.filter(lease__pastLease=False).distinct()
+    elif lease_status_filter == "none":
+        tenants = tenants.exclude(lease__pastLease=False).distinct()
+
+
+    lease_by_tenant_id = {lease.tenantName_id: lease for lease in active_leases}
 
     for t in tenants:
         if not (t.companyName or "").strip():
             t.companyName_display = t.contactPerson
-
         else:
             t.companyName_display = t.companyName
 
+        lease = lease_by_tenant_id.get(t.id)
+        t.buildingName_display = lease.buildingName.buildingName if lease else "No active lease"
 
+    buildings = Building.objects.all()
     date_today = get_date_today()
-    return render(request, "billingApp/payments_main.html", {"tenants": tenants, "leases": leases, "date_today": date_today})
+
+    return render(
+        request,
+        "billingApp/payments_main.html",
+        {
+            "tenants": tenants,
+            "leases": leases,
+            "buildings": buildings,
+            "selected_building": building_filter,
+            "selected_lease_status": lease_status_filter,
+            "date_today": date_today,
+        }
+    )
 
 def view_payments(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
