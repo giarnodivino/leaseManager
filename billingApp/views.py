@@ -719,10 +719,6 @@ def add_payment(request, pk):
         reference_number = request.POST.get("referenceNumber")
         admin_account = get_logged_in_account(request)
 
-        if amount_paid < 0:
-            messages.error(request, "Amount paid cannot be negative.")
-            return redirect("add_payment", pk=tenant.pk)
-
         if not (billing_id and amount_paid and date_paid and payment_method and reference_number):
             messages.error(request, "Please fill in all required fields.")
             return redirect("add_payment", pk=tenant.pk)
