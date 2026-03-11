@@ -7,10 +7,10 @@ from django.db.models import Q
 
 # Create your models here.
 class Building(models.Model):
-    buildingName = models.CharField(max_length=100, unique=True)
+    buildingName = models.CharField(max_length=26, unique=True)
     signageCapacity = models.IntegerField(default=0)
     parkingCapacity = models.IntegerField(default=0)
-    buildingAddress = models.CharField(max_length=200)
+    buildingAddress = models.CharField(max_length=50)
     modified_by = models.ForeignKey("Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     modified_at = models.DateTimeField(auto_now=True, null=True, blank=True)
     objects = models.Manager
