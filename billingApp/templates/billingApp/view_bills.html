@@ -94,7 +94,11 @@
     </div>
     <div class="columns">
       <div class="column has-text-right">
+        {% if has_active_lease %}
         <a href="{% url 'soa' pk=tenant.id %}" class="button" style="background-color: #f7f2ed">Generate SOA</a>
+        {% else %}
+        <button class="button" style="background-color: #f7f2ed" disabled>Generate SOA</button>
+        {% endif %}
       </div>
     </div>
     <div class="message is-danger">

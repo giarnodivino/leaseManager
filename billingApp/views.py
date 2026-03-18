@@ -217,6 +217,7 @@ def add_tenant(request):
 
         if companyName:
             if Tenant.objects.filter(companyName=companyName).exists():
+                messages.error(request, "A tenant with this company name already exists.")
                 return redirect('add_tenant')
         else:
             companyName = None
@@ -457,7 +458,18 @@ def view_bills(request, pk):
                     bill.status = BillingRecord.STATUS_UNPAID
                 bill.save()
 
-    return render(request, 'billingApp/view_bills.html', {"tenant": tenant, "bills": bills, "payments": payments})
+    has_active_lease = Lease.objects.filter(tenantName=tenant, pastLease=False).exists()
+
+    return render(
+        request,
+        'billingApp/view_bills.html',
+        {
+            "tenant": tenant,
+            "bills": bills,
+            "payments": payments,
+            "has_active_lease": has_active_lease,
+        },
+    )
 
 @login_required
 def add_bill(request, pk):
@@ -608,7 +620,17 @@ from .models import Tenant, BillingRecord
 @login_required
 def soa(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
-    lease = get_object_or_404(Lease, tenantName=tenant, pastLease=False)
+    lease = (
+        Lease.objects
+        .filter(tenantName=tenant, pastLease=False)
+        .select_related("buildingName", "unitID")
+        .order_by("-contractStart", "-id")
+        .first()
+    )
+
+    if not lease:
+        messages.error(request, "This tenant does not have an active lease. Unable to generate SOA.")
+        return redirect("view_bills", pk=tenant.pk)
 
     bills_qs = BillingRecord.objects.filter(
         tenant=tenant,
@@ -680,10 +702,21 @@ def soa(request, pk):
     }
     return render(request, "billingApp/soa.html", context)
 
-    
+
 def add_payment(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
-    lease = get_object_or_404(Lease, tenantName=tenant, pastLease=False)
+    lease = (
+        Lease.objects
+        .filter(tenantName=tenant, pastLease=False)
+        .select_related("buildingName")
+        .order_by("-contractStart", "-id")
+        .first()
+    )
+
+    if not lease:
+        messages.error(request, "This tenant does not have an active lease.")
+        return redirect("view_payments", pk=tenant.pk)
+
     bills = BillingRecord.objects.filter(tenant=tenant, status=BillingRecord.STATUS_UNPAID).order_by("dateIssued", "id")
 
     if not (tenant.companyName or "").strip():
@@ -691,10 +724,6 @@ def add_payment(request, pk):
 
     else:
         tenant.companyName_display = tenant.companyName
-
-    if not lease:
-        messages.error(request, "This tenant does not have an active lease.")
-        return redirect("view_payments", pk=tenant.pk)
 
     if lease.rentAmount:
         lease.rentAmount = f"{lease.rentAmount:,.2f}"
@@ -712,15 +741,29 @@ def add_payment(request, pk):
 
     if request.method == "POST":
         billing_id = request.POST.get("bill_id")
-        amount_paid = request.POST.get("amountPaid")
+        amount_paid_raw = request.POST.get("amountPaid")
         sub_account_name = request.POST.get("subAccountName")
         date_paid = request.POST.get("datePaid")
         payment_method = request.POST.get("paymentMethod")
-        reference_number = request.POST.get("referenceNumber")
+        reference_number = (request.POST.get("referenceNumber") or "").strip()
         admin_account = get_logged_in_account(request)
 
-        if not (billing_id and amount_paid and date_paid and payment_method and reference_number):
+        if Payment.objects.filter(referenceNumber=reference_number).exists():
+            messages.error(request, "This reference number has already been used for another payment.")
+            return redirect("add_payment", pk=tenant.pk)
+
+        if not (billing_id and amount_paid_raw and date_paid and payment_method and reference_number):
             messages.error(request, "Please fill in all required fields.")
+            return redirect("add_payment", pk=tenant.pk)
+
+        try:
+            amount_paid = Decimal(str(amount_paid_raw))
+        except (TypeError, ValueError, ArithmeticError):
+            messages.error(request, "Amount paid is invalid.")
+            return redirect("add_payment", pk=tenant.pk)
+
+        if amount_paid < Decimal("0"):
+            messages.error(request, "Amount paid cannot be negative.")
             return redirect("add_payment", pk=tenant.pk)
 
         try:
@@ -751,3 +794,9 @@ def add_payment(request, pk):
             return redirect("add_payment", pk=tenant.pk)
     
     return render(request, "billingApp/add_payment.html", {"tenant": tenant, "lease": lease, "bills": bills})
+
+def delete_payment(request, pk):
+    payment = get_object_or_404(Payment, pk=pk)
+    tenant_pk = payment.tenantID_id
+    payment.delete()
+    return redirect("view_payments", pk=tenant_pk)
