@@ -460,6 +460,10 @@ def view_bills(request, pk):
 
     has_active_lease = Lease.objects.filter(tenantName=tenant, pastLease=False).exists()
 
+    date_today = get_date_today()
+
+
+
     return render(
         request,
         'billingApp/view_bills.html',
@@ -468,6 +472,7 @@ def view_bills(request, pk):
             "bills": bills,
             "payments": payments,
             "has_active_lease": has_active_lease,
+            "date_today": date_today,
         },
     )
 
