@@ -33,10 +33,10 @@
   </div>
   <div class="column">
     <p class="is-size-6">Total Unpaid: </p>
-    <h2 class="is-size-4">test</h2>
+    <h2 class="is-size-4 has-text-weight-bold">{{total_unpaid_balance}}</h2>
   </div>
   <div class="column is-2">
-    <a href="">
+    <a href="{% url 'add_payment' pk=tenant.pk %}">
       <svg width="144" height="40" viewBox="0 0 144 40" fill="none" xmlns="http://www.w3.org/2000/svg">
         <g clip-path="url(#clip0_117_712)">
           <rect width="144" height="40" rx="8" fill="#F7F2ED" />

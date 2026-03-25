@@ -429,6 +429,9 @@ def view_bills(request, pk):
     bills = BillingRecord.objects.filter(tenant=tenant).order_by("-id")
     payments = Payment.objects.filter(tenantID=tenant)
 
+
+    total_unpaid_balance = Decimal("0.00")
+
     if not (tenant.companyName or "").strip():
         tenant.companyName_display = tenant.contactPerson
     else:
@@ -442,6 +445,12 @@ def view_bills(request, pk):
         elif b.status == BillingRecord.STATUS_PARTIAL:
             b.balance = b.balance or (b.amountDue or Decimal("0.00"))
 
+        if b.balance and b.balance > Decimal("0.00"):
+            total_unpaid_balance += b.balance
+            # add a comma to the unpaid balance
+            b.balance_display = f"{b.balance:,.2f}"
+        else:
+            b.balance_display = "0.00"
 
     for payment in payments:
         if payment.billingID in bills:
@@ -473,6 +482,7 @@ def view_bills(request, pk):
             "payments": payments,
             "has_active_lease": has_active_lease,
             "date_today": date_today,
+            "total_unpaid_balance": f"{total_unpaid_balance:,.2f}",
         },
     )
 
