@@ -19,6 +19,12 @@
             </div>
         </form>
     </div>
+    <!-- Back button -->
+    <div class="columns is-justify-content-center p-4">
+        <div class="column is-12">
+            <a class="button" href="{% url 'building_details' pk=building.pk %}">Back</a>
+        </div>
+    </div>
 </div>
 {% if messages %}
     <div class="columns is-justify-content-center p-4">

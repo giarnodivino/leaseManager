@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 
 def get_available_units(building_id):
@@ -14,20 +14,16 @@ def get_available_units(building_id):
 
 def calculate_total_outstanding():
     total_outstanding = Decimal("0.00")
-    billing_records = BillingRecord.objects.all()
+    billing_records = BillingRecord.objects.exclude(status=BillingRecord.STATUS_PAID)
     for record in billing_records:
-        total_outstanding += record.amountDue or Decimal("0.00")
+        total_outstanding += record.balance or Decimal("0.00")
     return f"{total_outstanding:,.2f}"
 
 def calculate_total_revenue():
     total_revenue = Decimal("0.00")
-    lease_records = Lease.objects.filter(pastLease=False)
-    for lease in lease_records:
-        total_revenue += (
-            (lease.rentAmount or Decimal("0.00"))
-            + (lease.signageFees or Decimal("0.00"))
-            + (lease.parkingFees or Decimal("0.00"))
-        )
+    payments = Payment.objects.all()
+    for payment in payments:
+        total_revenue += payment.amountPaid or Decimal("0.00")
     return f"{total_revenue:,.2f}"
 
 def get_date_today():
@@ -438,34 +434,13 @@ def view_bills(request, pk):
         tenant.companyName_display = tenant.companyName
 
     for b in bills:
-        if b.status == BillingRecord.STATUS_PAID:
-            b.balance = Decimal("0.00")
-        elif b.status == BillingRecord.STATUS_UNPAID:
-            b.balance = b.amountDue or Decimal("0.00")
-        elif b.status == BillingRecord.STATUS_PARTIAL:
-            b.balance = b.balance or (b.amountDue or Decimal("0.00"))
-
-        if b.balance and b.balance > Decimal("0.00"):
+        # Balance is now maintained in the database, no need to recalculate
+        b.balance = b.balance or Decimal("0.00")
+        if b.balance > Decimal("0.00"):
             total_unpaid_balance += b.balance
-            # add a comma to the unpaid balance
             b.balance_display = f"{b.balance:,.2f}"
         else:
             b.balance_display = "0.00"
-
-    for payment in payments:
-        if payment.billingID in bills:
-            bill = payment.billingID
-            amount_paid = payment.amountPaid or Decimal("0.00")
-            if bill.balance is not None:
-                bill.balance = (bill.balance - amount_paid).quantize(Decimal("0.01"))
-                if bill.balance <= Decimal("0.00"):
-                    bill.status = BillingRecord.STATUS_PAID
-                    bill.balance = Decimal("0.00")
-                elif bill.balance < (bill.amountDue or Decimal("0.00")):
-                    bill.status = BillingRecord.STATUS_PARTIAL
-                else:
-                    bill.status = BillingRecord.STATUS_UNPAID
-                bill.save()
 
     has_active_lease = Lease.objects.filter(tenantName=tenant, pastLease=False).exists()
 
@@ -506,7 +481,7 @@ def add_bill(request, pk):
 
             if billing_for and date_issued:
                 if (billing_for or "").upper() == "RENT":
-                    amountdue = lease.rentAmount
+                    amountdue = (lease.rentAmount or Decimal("0.00")) + (lease.parkingFees or Decimal("0.00")) + (lease.signageFees or Decimal("0.00"))
                     BillingRecord.objects.create(
                         tenant=tenant,
                         lease=lease,
@@ -554,14 +529,18 @@ def add_units(request, pk):
             return redirect("add_unit", pk=building_id)
 
     buildings = Building.objects.all()
-    return render(request, "billingApp/add_unit.html", {"buildings": buildings, "building": building_details})
+
+    date_today = get_date_today()
+    return render(request, "billingApp/add_unit.html", {"buildings": buildings, "building": building_details, "date_today": date_today})
 
 
 @login_required
 def view_units(request, pk):
     building = get_object_or_404(Building, pk=pk)
     units = Units.objects.filter(building=building).order_by("unitID")
-    return render(request, "billingApp/view_units.html", {"building": building, "units": units})
+    date_today = get_date_today()
+    return render(request, "billingApp/view_units.html", {"building": building, "units": units, "date_today": date_today})
+
 
 @login_required
 def payments_main(request):
@@ -649,8 +628,7 @@ def soa(request, pk):
 
     bills_qs = BillingRecord.objects.filter(
         tenant=tenant,
-        status=BillingRecord.STATUS_UNPAID,
-    ).order_by("dateIssued", "id")
+    ).exclude(status=BillingRecord.STATUS_PAID).order_by("dateIssued", "id")
 
     ids = request.GET.get("ids")
     if ids:
@@ -661,43 +639,116 @@ def soa(request, pk):
     grand_total = Decimal("0.00")
 
     for b in bills_qs:
-        amount = (b.amountDue or Decimal("0.00")).quantize(Decimal("0.01"))
-
-
-        vat = Decimal("0.00")
-
-
-        if b.billingFor == BillingRecord.RENT:
-            vat = (amount * Decimal("0.12")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            amount = (amount - vat).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-        total = (amount + vat).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        grand_total += total
-
+        amount = (b.balance or Decimal("0.00")).quantize(Decimal("0.01"))
 
         bill_no = f"BL-{b.id:06d}"
-
-
-        particulars = ""
+        
         if b.billingFor == BillingRecord.RENT:
+            # For rent bills, break down the remaining balance proportionally
+            rent_amount = (b.lease.rentAmount or Decimal("0.00")).quantize(Decimal("0.01"))
+            parking_fees = (b.lease.parkingFees or Decimal("0.00")).quantize(Decimal("0.01"))
+            signage_fees = (b.lease.signageFees or Decimal("0.00")).quantize(Decimal("0.01"))
+            
+            # Derive VAT as 12% of rent amount
+            vat_amount = (rent_amount * Decimal("0.12")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            # Base rent = rent amount - derived VAT
+            base_rent = (rent_amount - vat_amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            
+            # Calculate total original amount
+            original_total = base_rent + vat_amount + parking_fees + signage_fees
+            
+            # Calculate scale factor for remaining balance
+            if original_total > Decimal("0.00"):
+                scale = amount / original_total
+            else:
+                scale = Decimal("1.00")
+            
+            # Scale each component
+            scaled_base_rent = (base_rent * scale).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            scaled_vat = (vat_amount * scale).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            scaled_parking = (parking_fees * scale).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            scaled_signage = (signage_fees * scale).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            
+            # Add base rent line
+            if scaled_base_rent > 0:
+                lines.append({
+                    "no": bill_no,
+                    "date": b.dateIssued,
+                    "particulars": "Rent",
+                    "amount": scaled_base_rent,
+                    "vat": Decimal("0.00"),
+                    "total": scaled_base_rent,
+                    "amount_display": f"{scaled_base_rent:,.2f}",
+                    "vat_display": "0.00",
+                    "total_display": f"{scaled_base_rent:,.2f}",
+                })
+            
+            # Add VAT line
+            if scaled_vat > 0:
+                lines.append({
+                    "no": bill_no,
+                    "date": b.dateIssued,
+                    "particulars": "VAT (12%)",
+                    "amount": Decimal("0.00"),
+                    "vat": scaled_vat,
+                    "total": scaled_vat,
+                    "amount_display": "0.00",
+                    "vat_display": f"{scaled_vat:,.2f}",
+                    "total_display": f"{scaled_vat:,.2f}",
+                })
+            
+            # Add parking fees line
+            if scaled_parking > 0:
+                lines.append({
+                    "no": bill_no,
+                    "date": b.dateIssued,
+                    "particulars": "Parking Fees",
+                    "amount": scaled_parking,
+                    "vat": Decimal("0.00"),
+                    "total": scaled_parking,
+                    "amount_display": f"{scaled_parking:,.2f}",
+                    "vat_display": "0.00",
+                    "total_display": f"{scaled_parking:,.2f}",
+                })
+            
+            # Add signage fees line
+            if scaled_signage > 0:
+                lines.append({
+                    "no": bill_no,
+                    "date": b.dateIssued,
+                    "particulars": "Signage Fees",
+                    "amount": scaled_signage,
+                    "vat": Decimal("0.00"),
+                    "total": scaled_signage,
+                    "amount_display": f"{scaled_signage:,.2f}",
+                    "vat_display": "0.00",
+                    "total_display": f"{scaled_signage:,.2f}",
+                })
+            
+            grand_total += amount
+            
+        else:
+            # For non-rent bills
+            total = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            grand_total += total
 
-            particulars = "Rent"
-        elif b.billingFor == BillingRecord.ELECTRICITY:
-            particulars = "Electric"
-        elif b.billingFor == BillingRecord.WATER:
-            particulars = "Water"
+            particulars = ""
+            if b.billingFor == BillingRecord.ELECTRICITY:
+                particulars = "Electric"
+            elif b.billingFor == BillingRecord.WATER:
+                particulars = "Water"
 
-        lines.append({
-            "no": bill_no,
-            "date": b.dateIssued,
-            "particulars": particulars,
-            "amount": amount,
-            "vat": vat,
-            "total": total,
-            "amount_display": f"{amount:,.2f}",
-            "vat_display": f"{vat:,.2f}",
-            "total_display": f"{total:,.2f}",
-        })
+            lines.append({
+                "no": bill_no,
+                "date": b.dateIssued,
+                "particulars": particulars,
+                "amount": amount,
+                "vat": Decimal("0.00"),
+                "total": total,
+                "amount_display": f"{amount:,.2f}",
+                "vat_display": "0.00",
+                "total_display": f"{total:,.2f}",
+            })
 
 
     company_display = (tenant.companyName or "").strip() or tenant.contactPerson
@@ -803,6 +854,18 @@ def add_payment(request, pk):
                 referenceNumber=reference_number,
                 paymentMethod=payment_method,
             )
+
+            # Update the bill's balance after payment
+            bill_to_pay.balance = (bill_to_pay.balance or bill_to_pay.amountDue) - amount_paid
+            if bill_to_pay.balance <= Decimal("0.00"):
+                bill_to_pay.status = BillingRecord.STATUS_PAID
+                bill_to_pay.balance = Decimal("0.00")
+            elif bill_to_pay.balance < bill_to_pay.amountDue:
+                bill_to_pay.status = BillingRecord.STATUS_PARTIAL
+            else:
+                bill_to_pay.status = BillingRecord.STATUS_UNPAID
+            bill_to_pay.save()
+
             return redirect("view_payments", pk=tenant.pk)
         except Exception:
             messages.error(request, "Unable to save payment. Please verify the form values.")
@@ -813,5 +876,20 @@ def add_payment(request, pk):
 def delete_payment(request, pk):
     payment = get_object_or_404(Payment, pk=pk)
     tenant_pk = payment.tenantID_id
+    bill = payment.billingID
+    amount_paid = payment.amountPaid or Decimal("0.00")
     payment.delete()
+
+    # Update the bill's balance after deleting payment
+    bill.balance = (bill.balance or Decimal("0.00")) + amount_paid
+    if bill.balance >= bill.amountDue:
+        bill.status = BillingRecord.STATUS_UNPAID
+        bill.balance = bill.amountDue
+    elif bill.balance > Decimal("0.00"):
+        bill.status = BillingRecord.STATUS_PARTIAL
+    else:
+        bill.status = BillingRecord.STATUS_PAID
+        bill.balance = Decimal("0.00")
+    bill.save()
+
     return redirect("view_payments", pk=tenant_pk)

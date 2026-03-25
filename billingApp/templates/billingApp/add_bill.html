@@ -67,7 +67,9 @@
   document.addEventListener("DOMContentLoaded", function () {
     const billingForSelect = document.getElementById("billingFor");
     const payableInput = document.getElementById("payable");
-    const rentAmount = "{{ lease.rentAmount|default_if_none:'0.00' }}";
+    const rentAmount = parseFloat("{{ lease.rentAmount|default_if_none:'0.00' }}");
+    const parkingFees = parseFloat("{{ lease.parkingFees|default_if_none:'0.00' }}");
+    const signageFees = parseFloat("{{ lease.signageFees|default_if_none:'0.00' }}");
     let manualPayableValue = payableInput.value;
 
     function togglePayableState() {
@@ -75,7 +77,8 @@
 
       if (isRent) {
         manualPayableValue = payableInput.value;
-        payableInput.value = rentAmount;
+        const totalRent = rentAmount + parkingFees + signageFees;
+        payableInput.value = totalRent.toFixed(2);
         payableInput.disabled = true;
         return;
       }
