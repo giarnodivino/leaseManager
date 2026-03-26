@@ -306,6 +306,10 @@ def add_lease(request, pk):
             messages.error(request, "Selected unit does not belong to the chosen building.")
             return redirect("add_lease", pk=tenant.pk)
 
+        if not contractStart or not contractLength:
+            messages.error(request, "Please provide both contract start date and contract length.")
+            return redirect("add_lease", pk=tenant.pk)
+
         occupied_lease = Lease.objects.filter(
             buildingName=selected_building,
             unitID=selected_unit,
