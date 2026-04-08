@@ -35,6 +35,7 @@ class Tenant(models.Model):
     contactPerson = models.CharField(max_length=100)
     phoneNumber = models.CharField(max_length=12)
     email = models.CharField(max_length=50)
+    carryover_balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     modified_by = models.ForeignKey("Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     modified_at = models.DateTimeField(auto_now=True, null=True, blank=True)
     objects = models.Manager
@@ -100,11 +101,15 @@ class BillingRecord(models.Model):
     STATUS_UNPAID = "UNPAID"
     STATUS_PARTIAL = "PARTIAL"
     STATUS_PAID = "PAID"
+    STATUS_UNDERPAID = "UNDERPAID"
+    STATUS_OVERPAID = "OVERPAID"
 
     STATUS_CHOICES = [
         (STATUS_UNPAID, "Unpaid"),
         (STATUS_PARTIAL, "Partial"),
         (STATUS_PAID, "Paid"),
+        (STATUS_UNDERPAID, "Underpaid"),
+        (STATUS_OVERPAID, "Overpaid"),
     ]
 
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_UNPAID)

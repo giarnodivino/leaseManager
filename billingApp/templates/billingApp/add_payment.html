@@ -24,7 +24,7 @@
                             <select name="bill_id" id="bill_id" required>
                                 <option value="" disabled selected>Select a bill</option>
                                 {% for bill in bills %}
-                                <option value="{{ bill.id }}">{{ bill.display_id }} - {{ bill.billingFor }} - ₱ {{ bill.amountDue }}</option>
+                                <option value="{{ bill.id }}">{{ bill.display_id }} - {{ bill.billingFor }} - Status: {{ bill.status }} - Due: ₱ {{ bill.display_amount }}</option>
                                 {% endfor %}
                             </select>
                         </div>

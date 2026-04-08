@@ -34,6 +34,9 @@
   <div class="column">
     <p class="is-size-6">Total Unpaid: </p>
     <h2 class="is-size-4 has-text-weight-bold">{{total_unpaid_balance}}</h2>
+    {% if carryover_due_display and carryover_due_display != "0.00" %}
+    <p class="is-size-6 has-text-danger">Carryover Due: ₱ {{ carryover_due_display }}</p>
+    {% endif %}
   </div>
   <div class="column is-2">
     <a href="{% url 'add_payment' pk=tenant.pk %}">
@@ -98,7 +101,7 @@
             <th>Date Due</th>
             <th>Particulars</th>
             <th>Total Bill</th>
-            <th>Balance</th>
+            <th>Status</th>
             <th></th>
             <th></th>
           </tr>
@@ -112,7 +115,7 @@
             <td>{{ b.dateDue }}</td>
             <td>{{ b.billingFor }}</td>
             <td>₱ {{ b.amountDue }}</td>
-            <td>₱ {{ b.balance }}</td>
+            <td>{{ b.status }}</td>
             <td><a href="" class="button is-small" style="background-color: #f7f2ed">Edit Bill</a></td>
             <td><a href="" class="button is-small" style="background-color: #f7f2ed">View Payment</a></td>
           </tr>
