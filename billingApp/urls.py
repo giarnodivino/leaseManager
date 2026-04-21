@@ -26,4 +26,5 @@ urlpatterns = [
     path('soa/<int:pk>/', views.soa, name='soa'),
     path('add_payment/<int:pk>/', views.add_payment, name='add_payment'),
     path('delete_payment/<int:pk>/', views.delete_payment, name='delete_payment'),
+    path('delete_bill/<int:pk>/', views.delete_bill, name='delete_bill'),
 ]

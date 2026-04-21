@@ -808,7 +808,6 @@ def add_payment(request, pk):
             BillingRecord.STATUS_UNPAID,
             BillingRecord.STATUS_PARTIAL,
             BillingRecord.STATUS_UNDERPAID,
-            BillingRecord.STATUS_OVERPAID,
         ],
     ).order_by("dateIssued", "id")
 
@@ -954,3 +953,9 @@ def delete_payment(request, pk):
     bill.save()
 
     return redirect("view_payments", pk=tenant_pk)
+
+def delete_bill(request, pk):
+    bill = get_object_or_404(BillingRecord, pk=pk)
+    tenant_pk = bill.tenant_id
+    bill.delete()
+    return redirect("view_bills", pk=tenant_pk)
