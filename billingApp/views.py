@@ -442,7 +442,10 @@ def view_bills(request, pk):
     for b in bills:
         # Balance is now maintained in the database, no need to recalculate
         b.balance = b.balance or Decimal("0.00")
-        if b.balance > Decimal("0.00"):
+        if b.status == BillingRecord.STATUS_OVERPAID:
+            # Show overpaid amount from carryover_balance
+            b.balance_display = f"{tenant.carryover_balance or Decimal('0.00'):,.2f}"
+        elif b.balance > Decimal("0.00"):
             total_unpaid_balance += b.balance
             b.balance_display = f"{b.balance:,.2f}"
         else:
@@ -677,7 +680,7 @@ def soa(request, pk):
         bill_no = f"BL-{b.id:06d}"
         
         if b.billingFor == BillingRecord.RENT:
-            # For rent bills, break down the remaining balance proportionally
+            # For rent bills, calculate components
             rent_amount = (b.lease.rentAmount or Decimal("0.00")).quantize(Decimal("0.01"))
             parking_fees = (b.lease.parkingFees or Decimal("0.00")).quantize(Decimal("0.01"))
             signage_fees = (b.lease.signageFees or Decimal("0.00")).quantize(Decimal("0.01"))
@@ -702,61 +705,22 @@ def soa(request, pk):
             scaled_parking = (parking_fees * scale).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             scaled_signage = (signage_fees * scale).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             
-            # Add base rent line
-            if scaled_base_rent > 0:
-                lines.append({
-                    "no": bill_no,
-                    "date": b.dateIssued,
-                    "particulars": "Rent",
-                    "amount": scaled_base_rent,
-                    "vat": Decimal("0.00"),
-                    "total": scaled_base_rent,
-                    "amount_display": f"{scaled_base_rent:,.2f}",
-                    "vat_display": "0.00",
-                    "total_display": f"{scaled_base_rent:,.2f}",
-                })
+            # Combine into one line
+            total_amount = scaled_base_rent + scaled_parking + scaled_signage
+            total_vat = scaled_vat
+            total_line = total_amount + total_vat
             
-            # Add VAT line
-            if scaled_vat > 0:
-                lines.append({
-                    "no": bill_no,
-                    "date": b.dateIssued,
-                    "particulars": "VAT (12%)",
-                    "amount": Decimal("0.00"),
-                    "vat": scaled_vat,
-                    "total": scaled_vat,
-                    "amount_display": "0.00",
-                    "vat_display": f"{scaled_vat:,.2f}",
-                    "total_display": f"{scaled_vat:,.2f}",
-                })
-            
-            # Add parking fees line
-            if scaled_parking > 0:
-                lines.append({
-                    "no": bill_no,
-                    "date": b.dateIssued,
-                    "particulars": "Parking Fees",
-                    "amount": scaled_parking,
-                    "vat": Decimal("0.00"),
-                    "total": scaled_parking,
-                    "amount_display": f"{scaled_parking:,.2f}",
-                    "vat_display": "0.00",
-                    "total_display": f"{scaled_parking:,.2f}",
-                })
-            
-            # Add signage fees line
-            if scaled_signage > 0:
-                lines.append({
-                    "no": bill_no,
-                    "date": b.dateIssued,
-                    "particulars": "Signage Fees",
-                    "amount": scaled_signage,
-                    "vat": Decimal("0.00"),
-                    "total": scaled_signage,
-                    "amount_display": f"{scaled_signage:,.2f}",
-                    "vat_display": "0.00",
-                    "total_display": f"{scaled_signage:,.2f}",
-                })
+            lines.append({
+                "no": bill_no,
+                "date": b.dateIssued,
+                "particulars": "Rent",
+                "amount": total_amount,
+                "vat": total_vat,
+                "total": total_line,
+                "amount_display": f"{total_amount:,.2f}",
+                "vat_display": f"{total_vat:,.2f}",
+                "total_display": f"{total_line:,.2f}",
+            })
             
             grand_total += amount
             
@@ -844,6 +808,7 @@ def add_payment(request, pk):
             BillingRecord.STATUS_UNPAID,
             BillingRecord.STATUS_PARTIAL,
             BillingRecord.STATUS_UNDERPAID,
+            BillingRecord.STATUS_OVERPAID,
         ],
     ).order_by("dateIssued", "id")
 
@@ -866,7 +831,15 @@ def add_payment(request, pk):
 
     for bill in bills:
         bill.display_id = f"BL-{bill.id:06d}"
-        bill.display_amount = bill.balance if bill.balance and bill.balance > Decimal("0.00") else bill.amountDue
+        if bill.status == BillingRecord.STATUS_UNDERPAID:
+            bill.display_label = "Underpaid by"
+            bill.display_amount = f"{abs(tenant.carryover_balance or Decimal('0.00')):,.2f}"
+        elif bill.status == BillingRecord.STATUS_OVERPAID:
+            bill.display_label = "Overpaid by"
+            bill.display_amount = f"{tenant.carryover_balance or Decimal('0.00'):,.2f}"
+        else:
+            bill.display_label = "Due"
+            bill.display_amount = bill.balance if bill.balance and bill.balance > Decimal("0.00") else bill.amountDue
 
     if request.method == "POST":
         billing_id = request.POST.get("bill_id")
@@ -919,24 +892,38 @@ def add_payment(request, pk):
             )
 
             # Update the bill's balance after payment and carry over any overpayment/underpayment.
-            old_balance = bill_to_pay.balance if bill_to_pay.balance is not None else bill_to_pay.amountDue
-            remaining_balance = old_balance - amount_paid
-
-            if remaining_balance < Decimal("0.00"):
-                # Overpayment becomes tenant credit for next bill.
-                tenant.carryover_balance = (tenant.carryover_balance or Decimal("0.00")) + (-remaining_balance)
-                bill_to_pay.status = BillingRecord.STATUS_OVERPAID
+            if bill_to_pay.status == BillingRecord.STATUS_UNDERPAID:
+                # For underpaid bills, payment is applied to the carryover balance
+                underpaid_amount = abs(tenant.carryover_balance or Decimal("0.00"))
+                tenant.carryover_balance = (tenant.carryover_balance or Decimal("0.00")) + amount_paid
                 bill_to_pay.balance = Decimal("0.00")
+                if tenant.carryover_balance > Decimal("0.00"):
+                    # Overpayment: credit for next bill
+                    bill_to_pay.status = BillingRecord.STATUS_OVERPAID
+                elif tenant.carryover_balance == Decimal("0.00"):
+                    # Exact payment: no carryover
+                    bill_to_pay.status = BillingRecord.STATUS_PAID
+                # else carryover_balance < 0: still UNDERPAID
                 tenant.save(update_fields=["carryover_balance"])
-            elif remaining_balance == Decimal("0.00"):
-                bill_to_pay.status = BillingRecord.STATUS_PAID
-                bill_to_pay.balance = Decimal("0.00")
             else:
-                # Underpayment is carried to the next bill.
-                bill_to_pay.status = BillingRecord.STATUS_UNDERPAID
-                bill_to_pay.balance = Decimal("0.00")
-                tenant.carryover_balance = (tenant.carryover_balance or Decimal("0.00")) - remaining_balance
-                tenant.save(update_fields=["carryover_balance"])
+                old_balance = bill_to_pay.balance if bill_to_pay.balance is not None else bill_to_pay.amountDue
+                remaining_balance = old_balance - amount_paid
+
+                if remaining_balance < Decimal("0.00"):
+                    # Overpayment becomes tenant credit for next bill.
+                    tenant.carryover_balance = (tenant.carryover_balance or Decimal("0.00")) + (-remaining_balance)
+                    bill_to_pay.status = BillingRecord.STATUS_OVERPAID
+                    bill_to_pay.balance = Decimal("0.00")
+                    tenant.save(update_fields=["carryover_balance"])
+                elif remaining_balance == Decimal("0.00"):
+                    bill_to_pay.status = BillingRecord.STATUS_PAID
+                    bill_to_pay.balance = Decimal("0.00")
+                else:
+                    # Underpayment is carried to the next bill.
+                    bill_to_pay.status = BillingRecord.STATUS_UNDERPAID
+                    bill_to_pay.balance = Decimal("0.00")
+                    tenant.carryover_balance = (tenant.carryover_balance or Decimal("0.00")) - remaining_balance
+                    tenant.save(update_fields=["carryover_balance"])
 
             bill_to_pay.save()
 
