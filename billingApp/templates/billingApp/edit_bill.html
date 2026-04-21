@@ -1,0 +1,67 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+
+</div>
+
+<div class="card card2">
+  <div class="card-content">
+    <p class="is-size-6 has-text-centered">Tenant: {{ tenant.companyName|default:tenant.contactPerson }}</p>
+    <h1 class="is-size-4 has-text-weight-bold has-text-centered pb-5">Billing ID: {{ bill.billing_number }}</h1>
+    <p>Billing Details:</p>
+
+    <form method="POST" action="{% url 'edit_bill' pk=bill.pk %}">
+      {% csrf_token %}
+      <div class="columns">
+        <div class="column pt-5">
+          <p class="">Date Issued:</p>
+          <input type="date" class="input" name="date_issued" value="{% if bill.dateIssued %}{{ bill.dateIssued|date:'Y-m-d' }}{% endif %}" required />
+        </div>
+      <div class="column pt-5">
+        <p class="">Amount:</p>
+        <input type="number" class="input" name="amount" value="{{ bill.amountDue }}" step="0.01" required />
+      </div>
+      <div class="column pt-5">
+        <p class="">Due Date:</p>
+        <input type="date" class="input" name="due_date" value="{% if bill.dateDue %}{{ bill.dateDue|date:'Y-m-d' }}{% endif %}" required />
+      </div>
+    </div>
+
+    <div class="columns">
+      <div class="column pt-5">
+        <p class="">Status:</p>
+        <div class="select is-fullwidth">
+          <select name="status" id="status" required>
+            <option value="">-- Select Status --</option>
+            <option value="UNPAID" {% if bill.status == 'UNPAID' %}selected{% endif %}>Unpaid</option>
+            <option value="PAID" {% if bill.status == 'PAID' %}selected{% endif %}>Paid</option>
+            <option value="UNDERPAID" {% if bill.status == 'UNDERPAID' %}selected{% endif %}>Underpaid</option>
+            <option value="OVERPAID" {% if bill.status == 'OVERPAID' %}selected{% endif %}>Overpaid</option>
+            <option value="PARTIAL" {% if bill.status == 'PARTIAL' %}selected{% endif %}>Partial</option>
+          </select>
+        </div>
+      </div>
+      <div class="column pt-5">
+        <p class="">Billing For:</p>
+        <div class="select is-fullwidth">
+          <select name="particulars" id="particulars" required>
+            <option value="">-- Select Type --</option>
+            <option value="RENT" {% if bill.billingFor == 'RENT' %}selected{% endif %}>Rent</option>
+            <option value="ELECTRICITY" {% if bill.billingFor == 'ELECTRICITY' %}selected{% endif %}>Electricity</option>
+            <option value="WATER" {% if bill.billingFor == 'WATER' %}selected{% endif %}>Water</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="field is-grouped is-grouped-centered">
+      <p class="control">
+        <a href="{% url 'delete_bill' tenant.pk %}" class="button is-danger">DELETE BILL</a>
+      </p>
+      <p class="control">
+        <button type="submit" class="button is-primary">UPDATE BILL</button>
+      </p>
+    </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

@@ -959,3 +959,47 @@ def delete_bill(request, pk):
     tenant_pk = bill.tenant_id
     bill.delete()
     return redirect("view_bills", pk=tenant_pk)
+
+# get a specific tenant's specific bill and allow editing of the bill's amount due and date issued, but only if the bill is not fully paid. If the bill is fully paid, show an error message that the bill cannot be edited.
+@login_required
+def edit_bill(request, pk):
+    bill = get_object_or_404(BillingRecord, pk=pk)
+    tenant = bill.tenant
+
+    # Only allow editing if bill is not fully paid
+    if bill.status == BillingRecord.STATUS_PAID:
+        messages.error(request, "Cannot edit a fully paid bill.")
+        return redirect("view_bills", pk=tenant.pk)
+    
+    if request.method == "POST":
+        # Get form data from edit_bill.html and update bill accordingly
+        date_issued = request.POST.get('date_issued')
+        amount = request.POST.get('amount')
+        due_date = request.POST.get('due_date')
+        status = request.POST.get('status')
+        particulars = request.POST.get('particulars')
+        admin_account = get_logged_in_account(request)
+        
+        try:
+            # Update bill fields
+            if date_issued:
+                bill.dateIssued = date_issued
+            if amount:
+                bill.amountDue = Decimal(amount)
+            if due_date:
+                bill.dateDue = due_date
+            if status:
+                bill.status = status
+            if particulars:
+                bill.billingFor = particulars
+            
+            bill.modified_by = admin_account
+            bill.save()
+            
+            messages.success(request, "Bill updated successfully.")
+            return redirect("view_bills", pk=tenant.pk)
+        except Exception as e:
+            messages.error(request, f"Error updating bill: {str(e)}")
+            return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill})
+    
+    return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill})
