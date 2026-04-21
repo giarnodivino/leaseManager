@@ -21,12 +21,21 @@ def calculate_total_outstanding():
         total_outstanding += record.balance or Decimal("0.00")
     return f"{total_outstanding:,.2f}"
 
+# total revenue should include all paid and unpaid bills
 def calculate_total_revenue():
     total_revenue = Decimal("0.00")
+    billing_records = BillingRecord.objects.all()
+    for record in billing_records:
+        total_revenue += record.amountDue or Decimal("0.00")
+    return f"{total_revenue:,.2f}"
+
+def calculate_total_paid():
+    total_paid = Decimal("0.00")
     payments = Payment.objects.all()
     for payment in payments:
-        total_revenue += payment.amountPaid or Decimal("0.00")
-    return f"{total_revenue:,.2f}"
+        total_paid += payment.amountPaid or Decimal("0.00")
+    return f"{total_paid:,.2f}"
+
 
 def get_date_today():
     from datetime import datetime
@@ -102,7 +111,8 @@ def logout_view(request):
 def home_page(request):
     total_outstanding_balance = calculate_total_outstanding()
     total_revenue = calculate_total_revenue()
-    return render(request, 'billingApp/home_page.html', {'total_outstanding': total_outstanding_balance, 'total_revenue': total_revenue})
+    total_paid = calculate_total_paid()
+    return render(request, 'billingApp/home_page.html', {'total_outstanding': total_outstanding_balance, 'total_revenue': total_revenue, 'total_paid': total_paid})
 
 @login_required
 def buildings_main(request):
