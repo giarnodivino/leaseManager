@@ -4,83 +4,93 @@
   <div class="card-content">
     <h1 class="is-size-3 has-text-weight-bold">Add Payment</h1>
     <div class="columns">
-        <div class="column">
-            <p class="is-size-5 mt-3">Tenant Details:</p>
-            <br>
-            <p class="is-size-5">{{ tenant.companyName_display }}</p>
-            <p class="is-size-5">{{ lease.buildingName }}</p>
-            <p class="is-size-5">Monthly Rent: ₱ {{ lease.rentAmount }}</p>
-            <p class="is-size-5">Parking: ₱ {{ lease.parkingFees }}</p>
-            <p class="is-size-5">Signage: ₱ {{ lease.signageFees }}</p>
-        </div>
-        <div class="column">
-            <form action="{% url 'add_payment' pk=tenant.id %}" method="POST">
-                {% csrf_token %}
+      <div class="column">
+        <p class="is-size-5 mt-3">Tenant Details:</p>
+        <br />
+        <p class="is-size-5">{{ tenant.companyName_display }}</p>
+        <p class="is-size-5">{{ lease.buildingName }}</p>
+        <p class="is-size-5">Monthly Rent: ₱ {{ lease.rentAmount }}</p>
+        <p class="is-size-5">Parking: ₱ {{ lease.parkingFees }}</p>
+        <p class="is-size-5 mb-6">Signage: ₱ {{ lease.signageFees }}</p>
+        <!--Upload proof of payment button-->
+      </div>
+      <div class="column">
+        <form action="{% url 'add_payment' pk=tenant.id %}" method="POST" enctype="multipart/form-data">
+          {% csrf_token %}
 
-                <div class="field">
-                    <label class="label">Select Bill to Pay:</label>
-                    <div class="control">
-                        <div class="select is-fullwidth">
-                            <select name="bill_id" id="bill_id" required>
-                                <option value="" disabled selected>Select a bill</option>
-                                {% for bill in bills %}
-                                <option value="{{ bill.id }}">{{ bill.display_id }} - {{ bill.billingFor }} - Status: {{ bill.status }} - {{ bill.display_label }}: ₱ {{ bill.display_amount }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="field">
-                    <label class="label">Amount Paid:</label>
-                    <div class="control">
-                        <input type="number" class="input" name="amountPaid" id="amountPaid" step="0.01" min="0" required>
-                    </div>
-                </div>
-                <div class="field">
-                    <label class="label">Date Paid:</label>
-                    <div class="control">
-                        <input type="date" class="input" name="datePaid" id="datePaid" required>
-                    </div>
-                </div>
+          <div class="field">
+            <label class="label">Select Bill to Pay:</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select name="bill_id" id="bill_id" required>
+                  <option value="" disabled selected>Select a bill</option>
+                  {% for bill in bills %}
+                  <option value="{{ bill.id }}">
+                    {{ bill.display_id }} - {{ bill.billingFor }} - Status: {{ bill.status }} - {{ bill.display_label }}: ₱ {{ bill.display_amount }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Amount Paid:</label>
+            <div class="control">
+              <input type="number" class="input" name="amountPaid" id="amountPaid" step="0.01" min="0" required />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Date Paid:</label>
+            <div class="control">
+              <input type="date" class="input" name="datePaid" id="datePaid" required />
+            </div>
+          </div>
 
-                <div class="field">
-                    <label class="label">Payment ID:</label>
-                    <div class="control">
-                        <input type="text" class="input" name="referenceNumber" id="referenceNumber" required>
-                    </div>
-                </div>
-                <div class="field">
-                    <label for="paymentMethod">Payment Method:</label>
-                    <div class="control">
-                        <div class="select is-fullwidth">
-                            <select name="paymentMethod" id="paymentMethod" required>
-                                <option value="" disabled selected>Select a payment method</option>
-                                <option value="CASH">Cash</option>
-                                <option value="PDC">PDC</option>
-                                <option value="BANK_TRANSFER">Bank Transfer</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="field">
-                    <div class="control">
-                        <button type="submit" class="button is-primary">Submit Payment</button>
-                    </div>
-                </div>
-            </form>
-        </div>
+          <div class="field">
+            <label class="label">Payment ID:</label>
+            <div class="control">
+              <input type="text" class="input" name="referenceNumber" id="referenceNumber" required />
+            </div>
+          </div>
+          <div class="field">
+            <label for="paymentMethod">Payment Method:</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select name="paymentMethod" id="paymentMethod" required>
+                  <option value="" disabled selected>Select a payment method</option>
+                  <option value="CASH">Cash</option>
+                  <option value="PDC">PDC</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <!--attach proof of payment-->
+          <div class="field">
+            <label for="proofOfPayment">Proof of Payment:</label>
+            <div class="control">
+              <input type="file" class="input" name="proofOfPayment" id="proofOfPayment" />
+            </div>
+          </div>
+          <div class="field">
+            <div class="control">
+              <button type="submit" class="button is-primary">Submit Payment</button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </div>
 
 <div class="message is-danger">
-      {% if messages %}
-      <ul class="messages message-header">
-        {% for message in messages %}
-        <li {% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-      </div>
+  {% if messages %}
+  <ul class="messages message-header">
+    {% for message in messages %}
+    <li {% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
 
 {% endblock %}

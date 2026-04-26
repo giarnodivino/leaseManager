@@ -771,16 +771,24 @@ def soa(request, pk):
             "no": "",
             "date": date.today(),
             "particulars": particulars,
-            "amount": Decimal("0.00"),
+            "amount": carryover_total,
             "vat": Decimal("0.00"),
             "total": carryover_total,
-            "amount_display": "0.00",
+            "amount_display": f"{carryover_total:,.2f}",
             "vat_display": "0.00",
             "total_display": f"{carryover_total:,.2f}",
         })
         grand_total += carryover_total
 
     company_display = (tenant.companyName or "").strip() or tenant.contactPerson
+    
+    current_admin = get_logged_in_account(request)
+    prepared_by_name = ""
+    if current_admin and current_admin.firstName and current_admin.lastName:
+        prepared_by_name = f"{current_admin.firstName} {current_admin.lastName}".strip()
+    elif current_admin:
+        # Fallback to username if names aren't set
+        prepared_by_name = current_admin.username or ""
 
     context = {
         "tenant": tenant,
@@ -793,7 +801,8 @@ def soa(request, pk):
 
         "deposit_account_number": "BDO 001498023822",
         "deposit_account_name": "J&F Divino Development Corporation",
-        "company_tin": "001-461-259-00000", 
+        "company_tin": "001-461-259-00000",
+        "prepared_by_name": prepared_by_name,
     }
     return render(request, "billingApp/soa.html", context)
 
@@ -857,6 +866,7 @@ def add_payment(request, pk):
         date_paid = request.POST.get("datePaid")
         payment_method = request.POST.get("paymentMethod")
         reference_number = (request.POST.get("referenceNumber") or "").strip()
+        proof_of_payment = request.FILES.get("proofOfPayment")
         admin_account = get_logged_in_account(request)
 
         if Payment.objects.filter(referenceNumber=reference_number).exists():
@@ -898,6 +908,7 @@ def add_payment(request, pk):
                 billingID=bill_to_pay,
                 referenceNumber=reference_number,
                 paymentMethod=payment_method,
+                proofOfPayment=proof_of_payment,
             )
 
             # Update the bill's balance after payment and carry over any overpayment/underpayment.
@@ -1013,3 +1024,10 @@ def edit_bill(request, pk):
             return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill})
     
     return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill})
+
+def view_payment_details(request, pk):
+    payment = get_object_or_404(Payment, pk=pk)
+    tenant = payment.tenantID
+    bill = payment.billingID
+
+    return render(request, "billingApp/payment_details.html", {"tenant": tenant, "payment": payment, "bill": bill})

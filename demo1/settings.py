@@ -123,3 +123,7 @@ LOGIN_REDIRECT_URL = "home_page"
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATICFILES_DIRS = [BASE_DIR / 'demo1/static']
+
+# Media files (User uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

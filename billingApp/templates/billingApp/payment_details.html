@@ -1,0 +1,34 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+</div>
+
+<div class="card card2">
+  <div class="card-content">
+    <p class="is-size-5 ">Tenant: {{ tenant.companyName|default:tenant.contactPerson }}</p>
+    <h1 class="is-size-3 has-text-weight-bold pb-5">Payment ID: {{ payment.referenceNumber }}</h1>
+    <p class="is-size-5 has-text-weight-bold mt-4 has-text-centered">Payment Details:</p>
+
+    <div class="columns has-text-centered">
+      <div class="column pt-5">
+        <p class="">Amount Paid:</p>
+        <p class="is-size-5">₱ {{ payment.amountPaid }}</p>
+      </div>
+      <div class="column pt-5">
+        <p class="">Date Paid:</p>
+        <p class="is-size-5">{{ payment.datePaid }}</p>
+      </div>
+      <div class="column pt-5">
+        <p class="">Payment Method:</p>
+        <p class="is-size-5">{{ payment.paymentMethod }}</p>
+      </div>
+    </div>
+
+    {% if payment.proofOfPayment %}
+    <div class="field has-text-centered mt-6">
+      <label class="label">Proof of Payment:</label>
+      <div class="control">
+        <a href="{{ payment.proofOfPayment.url }}" target="_blank" class="button is-link">View Proof of Payment</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+{% endblock %}
