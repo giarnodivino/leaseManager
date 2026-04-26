@@ -1031,3 +1031,9 @@ def view_payment_details(request, pk):
     bill = payment.billingID
 
     return render(request, "billingApp/payment_details.html", {"tenant": tenant, "payment": payment, "bill": bill})
+
+def view_proof_of_payment(request, pk):
+    payment = get_object_or_404(Payment, pk=pk)
+    tenant = payment.tenantID
+    
+    return render(request, "billingApp/view_proof_of_payment.html", {"payment": payment, "tenant": tenant})

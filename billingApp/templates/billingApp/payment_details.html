@@ -1,9 +1,14 @@
 {% extends 'billingApp/base.html' %} {% load static %} {% block content %}
 </div>
+<div class="is-right pb-4">
+  <a href="{% url 'view_payments' pk=tenant.id %}" class="button is-small is-right" style="background-color: #f7f2ed">
+    Back to Payments
+  </a>
+</div>
 
 <div class="card card2">
   <div class="card-content">
-    <p class="is-size-5 ">Tenant: {{ tenant.companyName|default:tenant.contactPerson }}</p>
+    <p class="is-size-5">Tenant: {{ tenant.companyName|default:tenant.contactPerson }}</p>
     <h1 class="is-size-3 has-text-weight-bold pb-5">Payment ID: {{ payment.referenceNumber }}</h1>
     <p class="is-size-5 has-text-weight-bold mt-4 has-text-centered">Payment Details:</p>
 
@@ -30,9 +35,10 @@
     <div class="field has-text-centered mt-6">
       <label class="label">Proof of Payment:</label>
       <div class="control">
-        <a href="{{ payment.proofOfPayment.url }}" target="_blank" class="button is-link">View Proof of Payment</a>
+        <a href="{% url 'view_proof_of_payment' pk=payment.id %}" class="button is-link">View Proof of Payment</a>
       </div>
     </div>
     {% endif %}
   </div>
-{% endblock %}
+  {% endblock %}
+</div>
