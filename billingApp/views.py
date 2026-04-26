@@ -471,7 +471,6 @@ def view_bills(request, pk):
     date_today = get_date_today()
 
 
-
     return render(
         request,
         'billingApp/view_bills.html',

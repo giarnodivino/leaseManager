@@ -127,6 +127,7 @@
             <td>₱ {{ b.amountDue }}</td>
             <td>{{ b.status }}</td>
             <td><a href="{% url 'edit_bill' pk=b.pk %}" class="button is-small" style="background-color: #f7f2ed">Edit Bill</a></td>
+            <!--if payment exists, view payment details-->
             <td><a href="" class="button is-small" style="background-color: #f7f2ed">View Payment</a></td>
           </tr>
           {% endfor %}
