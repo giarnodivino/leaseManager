@@ -32,7 +32,7 @@
     </h1>
   </div>
   <div class="column">
-    <p class="is-size-6">Total Unpaid: </p>
+    <p class="is-size-6">Total Unpaid:</p>
     <h2 class="is-size-4 has-text-weight-bold">{{total_unpaid_balance}}</h2>
     {% if carryover_due_display and carryover_due_display != "0.00" %}
     <p class="is-size-6 has-text-danger">Carryover Due: ₱ {{ carryover_due_display }}</p>
@@ -102,7 +102,7 @@
 
 <div class="card card3">
   <div class="card-content">
-    <div style="overflow: auto; max-height: 400px;">
+    <div style="overflow: auto; max-height: 400px">
       <table class="table is-fullwidth">
         <thead>
           <tr>
@@ -126,9 +126,25 @@
             <td>{{ b.billingFor }}</td>
             <td>₱ {{ b.amountDue }}</td>
             <td>{{ b.status }}</td>
-            <td><a href="{% url 'edit_bill' pk=b.pk %}" class="button is-small" style="background-color: #f7f2ed">Edit Bill</a></td>
+            <td>
+              <a href="{% url 'edit_bill' pk=b.pk %}" class="button is-small" style="background-color: #f7f2ed">
+                Edit Bill
+              </a>
+            </td>
             <!--if payment exists, view payment details-->
-            <td><a href="" class="button is-small" style="background-color: #f7f2ed">View Payment</a></td>
+            <td>
+              {% if b.payment %}
+              <a
+                href="{% url 'payment_details' pk=b.payment.pk %}"
+                class="button is-small"
+                style="background-color: #f7f2ed"
+              >
+                View Payment
+              </a>
+              {% else %}
+              <span style="color: #aaa">No Payment</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>

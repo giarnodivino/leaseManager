@@ -450,6 +450,7 @@ def view_bills(request, pk):
         tenant.companyName_display = tenant.companyName
 
     for b in bills:
+        b.payment = Payment.objects.filter(billingID=b).order_by("-id").first()
         # Balance is now maintained in the database, no need to recalculate
         b.balance = b.balance or Decimal("0.00")
         if b.status == BillingRecord.STATUS_OVERPAID:
