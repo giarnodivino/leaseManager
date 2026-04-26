@@ -70,7 +70,7 @@
           <div class="columns p-4 is-justify-content-center">
             <div class="buttons is-centered">
               <a href="" class="button">EDIT LEASE</a>
-              <a href="#" class="button">RENEW LEASE</a>
+              <a href="{% url 'renew_lease' pk=l.pk %}" class="button">RENEW LEASE</a>
               <a href="{% url 'delete_lease' pk=l.pk %}" class="button is-danger">DELETE LEASE</a>
             </div>
           </div>

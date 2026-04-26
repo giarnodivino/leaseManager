@@ -1,0 +1,160 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+
+</div>
+
+<div class="card">
+  <div class="card-content">
+    <h1 class="is-size-3 has-text-weight-bold has-text-centered">Renew Lease</h1>
+    <p class="has-text-centered mb-4">
+      Renewing the lease for
+      <strong>{{ tenant.contactPerson }}</strong>
+      at
+      <strong>{{ building.buildingName }}</strong>
+      , Unit {{ unit.unitID }}
+    </p>
+
+    {% if messages %}
+    <div class="message is-danger mb-4">
+      <div class="message-body">
+        {% for message in messages %}
+        <p {% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="notification is-info is-light mb-4">
+      <p><strong>Current Lease Details:</strong></p>
+      <p>Monthly Rent: ₱{{ lease.rentAmount|floatformat:2 }}</p>
+      <p>Contract Period: {{ lease.contractLength }} months</p>
+      <p>Start Date: {{ lease.contractStart }}</p>
+      <p>End Date: {{ lease.contractEnd }}</p>
+      {% if lease.signageFees %}
+      <p>Signage Fees: ₱{{ lease.signageFees|floatformat:2 }}</p>
+      {% endif %} {% if lease.parkingFees %}
+      <p>Parking Fees: ₱{{ lease.parkingFees|floatformat:2 }}</p>
+      {% endif %}
+    </div>
+
+    <form method="POST" action="{% url 'renew_lease' pk=lease.id %}">
+      {% csrf_token %}
+
+      <div class="columns is-justify-content-center p-4">
+        <div class="column is-3 mt-3">
+          <div class="select is-fullwidth is-medium is-info">
+            <select name="contractLength" required>
+              <option value="">Select Length</option>
+              <option value="12">12 Months</option>
+              <option value="6">6 Months</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-3">
+          <label for="rentAmount">Monthly Rent (₱) *</label>
+          <input
+            type="number"
+            class="input"
+            id="rentAmount"
+            name="rentAmount"
+            step="0.01"
+            min="0"
+            placeholder="Amount in PHP"
+            value="{{ lease.rentAmount|floatformat:2 }}"
+            required
+          />
+        </div>
+        <div class="column is-3">
+          <label for="vatAmount">VAT Amount (₱)</label>
+          <input
+            type="number"
+            class="input"
+            id="vatAmount"
+            name="vatAmount"
+            step="0.01"
+            min="0"
+            placeholder="Amount in PHP"
+            value="{{ lease.vatAmount|floatformat:2 }}"
+            readonly
+          />
+          <small class="has-text-grey">Auto-calculated (12% of rent)</small>
+        </div>
+      </div>
+
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-3">
+          <label for="parkingFees">Parking Fees (₱):</label>
+          <input
+            type="number"
+            class="input"
+            id="parkingFees"
+            name="parkingFees"
+            min="0"
+            step="0.01"
+            placeholder="Amount in PHP"
+            value="{% if lease.parkingFees %}{{ lease.parkingFees|floatformat:2 }}{% endif %}"
+          />
+        </div>
+        <div class="column is-3">
+          <label for="signageFees">Signage Fees (₱):</label>
+          <input
+            type="number"
+            class="input"
+            id="signageFees"
+            name="signageFees"
+            min="0"
+            step="0.01"
+            placeholder="Amount in PHP"
+            value="{% if lease.signageFees %}{{ lease.signageFees|floatformat:2 }}{% endif %}"
+          />
+        </div>
+      </div>
+
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-3">
+          <label for="contractStart">New Contract Start Date *:</label>
+          <input type="date" class="input" id="contractStart" name="contractStart" required />
+          <small class="has-text-grey">Enter the date the new lease will begin</small>
+        </div>
+      </div>
+
+      <div class="is-flex is-justify-content-center mt-5 mb-5">
+        <div class="buttons">
+          <button type="submit" class="button is-primary is-medium">Renew Lease</button>
+
+          <a href="{% url 'tenant_details' pk=tenant.id %}" class="button is-light is-medium">Cancel</a>
+        </div>
+      </div>
+
+      <div class="notification is-warning is-light">
+        <p>
+          <strong>Important:</strong>
+          When you renew this lease, the current lease will be archived (marked as past), and a new lease with the
+          updated terms will be created in the system.
+        </p>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Auto-calculate VAT when rent amount changes
+  document.getElementById("rentAmount").addEventListener("change", function () {
+    const rentAmount = parseFloat(this.value) || 0;
+    const vatAmount = rentAmount * 0.12;
+    document.getElementById("vatAmount").value = vatAmount.toFixed(2);
+  });
+
+  // Set default start date to today if not already set
+  document.addEventListener("DOMContentLoaded", function () {
+    const contractStartInput = document.getElementById("contractStart");
+    if (!contractStartInput.value) {
+      const today = new Date().toISOString().split("T")[0];
+      contractStartInput.value = today;
+    }
+  });
+</script>
+
+{% endblock %}

@@ -239,7 +239,7 @@ def add_tenant(request):
 @login_required
 def tenant_details(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
-    leases = Lease.objects.filter(tenantName=tenant)
+    leases = Lease.objects.filter(tenantName=tenant, pastLease=False)
 
     if not (tenant.companyName or "").strip():
         tenant.companyName_display = tenant.contactPerson
@@ -468,6 +468,7 @@ def view_bills(request, pk):
         total_unpaid_balance += carryover_due
 
     has_active_lease = Lease.objects.filter(tenantName=tenant, pastLease=False).exists()
+    active_lease = Lease.objects.filter(tenantName=tenant, pastLease=False).first()
 
     date_today = get_date_today()
 
@@ -480,6 +481,7 @@ def view_bills(request, pk):
             "bills": bills,
             "payments": payments,
             "has_active_lease": has_active_lease,
+            "active_lease": active_lease,
             "date_today": date_today,
             "total_unpaid_balance": f"{total_unpaid_balance:,.2f}",
             "carryover_due_display": f"{carryover_due:,.2f}",
@@ -1037,3 +1039,88 @@ def view_proof_of_payment(request, pk):
     tenant = payment.tenantID
     
     return render(request, "billingApp/view_proof_of_payment.html", {"payment": payment, "tenant": tenant})
+
+@login_required
+def renew_lease(request, pk):
+    """
+    Renew/edit a tenant's lease. 
+    Archives the current lease (marks as pastLease=True) and creates a new lease with updated terms.
+    """
+    lease = get_object_or_404(Lease, pk=pk)
+    tenant = lease.tenantName
+    building = lease.buildingName
+    unit = lease.unitID
+    
+    if request.method == "POST":
+        # Get the new lease terms from the form
+        new_rent_amount = request.POST.get("rentAmount")
+        new_vat_amount = request.POST.get("vatAmount")
+        new_signage_fees = request.POST.get("signageFees")
+        new_parking_fees = request.POST.get("parkingFees")
+        new_contract_length = request.POST.get("contractLength")
+        new_contract_start = request.POST.get("contractStart")
+        admin_account = get_logged_in_account(request)
+        
+        # Validate inputs
+        if not new_contract_start or not new_contract_length:
+            messages.error(request, "Please provide both contract start date and contract length.")
+            return render(request, "billingApp/renew_lease.html", {
+                "lease": lease,
+                "tenant": tenant,
+                "building": building,
+                "unit": unit,
+            })
+        
+        try:
+            # Convert values to appropriate types
+            new_rent_amount = float(new_rent_amount) if new_rent_amount else 0.0
+            new_vat_amount = float(new_vat_amount) if new_vat_amount else float(new_rent_amount * 0.12)
+            new_signage_fees = float(new_signage_fees) if new_signage_fees else None
+            new_parking_fees = float(new_parking_fees) if new_parking_fees else None
+            new_contract_length = int(new_contract_length)
+            
+            # Calculate contract end date
+            from datetime import datetime, timedelta
+            contract_start_date = datetime.strptime(new_contract_start, "%Y-%m-%d").date()
+            contract_end_date = contract_start_date + timedelta(days=new_contract_length * 30)
+            
+            # Archive the old lease (mark as pastLease=True)
+            lease.pastLease = True
+            lease.modified_by = admin_account
+            lease.save()
+            
+            # Create the new lease with updated terms
+            new_lease = Lease.objects.create(
+                buildingName=building,
+                tenantName=tenant,
+                unitID=unit,
+                rentAmount=new_rent_amount,
+                vatAmount=new_vat_amount,
+                signageFees=new_signage_fees,
+                parkingFees=new_parking_fees,
+                contractLength=new_contract_length,
+                contractStart=contract_start_date,
+                contractEnd=contract_end_date,
+                pastLease=False,
+                modified_by=admin_account,
+            )
+            
+            messages.success(request, "Lease renewed successfully. Previous lease has been archived.")
+            return redirect("tenant_details", pk=tenant.pk)
+            
+        except Exception as e:
+            messages.error(request, f"Error renewing lease: {str(e)}")
+            return render(request, "billingApp/renew_lease.html", {
+                "lease": lease,
+                "tenant": tenant,
+                "building": building,
+                "unit": unit,
+            })
+    
+    # Display the form pre-populated with current lease information
+    return render(request, "billingApp/renew_lease.html", {
+        "lease": lease,
+        "tenant": tenant,
+        "building": building,
+        "unit": unit,
+    })
