@@ -53,7 +53,8 @@
 
     <div class="field is-grouped is-grouped-centered">
       <p class="control">
-        <a href="{% url 'delete_bill' tenant.pk %}" class="button is-danger">DELETE BILL</a>
+        <!-- delete bill pk should be pk to bill, not tenant -->
+        <a href="{% url 'delete_bill' bill.pk %}" class="button is-danger">DELETE BILL</a>
       </p>
       <p class="control">
         <button type="submit" class="button is-primary">UPDATE BILL</button>

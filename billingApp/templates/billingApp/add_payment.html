@@ -34,8 +34,7 @@
                   <option value="" disabled selected>Select a bill</option>
                   {% for bill in bills %}
                   <option value="{{ bill.id }}">
-                    {{ bill.display_id }} - {{ bill.billingFor }} - Status: {{ bill.status }} - {{ bill.display_label
-                    }}: ₱ {{ bill.display_amount }}
+                    {{ bill.display_id }} - {{ bill.billingFor }} - Status: {{ bill.status }} - {{ bill.display_label }}: ₱ {{ bill.display_amount }}
                   </option>
                   {% endfor %}
                 </select>
