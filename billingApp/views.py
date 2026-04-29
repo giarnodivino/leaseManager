@@ -1487,7 +1487,7 @@ def edit_lease(request, pk):
 
 def edit_payment(request, pk):
     payment = get_object_or_404(Payment, pk=pk)
-    tenant_details = payment.tenantID
+    tenant = payment.tenantID
     bill = payment.billingID
     date_today = get_date_today()
     
@@ -1498,6 +1498,26 @@ def edit_payment(request, pk):
         payment_method = request.POST.get("paymentMethod")
         sub_account_name = request.POST.get("subAccountName")
         proof_of_payment = request.FILES.get("proofOfPayment")
+
+        if proof_of_payment:
+            # 5MB limit
+            max_size = 5 * 1024 * 1024  # 5MB in bytes
+
+            if proof_of_payment.size > max_size:
+                messages.error(request, "File too large. Maximum size is 5MB.")
+                return redirect("edit_payment", pk=tenant.pk)
+
+            # Allowed file types
+            allowed_types = [
+                "application/pdf",
+                "image/jpeg",
+                "image/png",
+                "image/webp"
+            ]
+
+            if proof_of_payment.content_type not in allowed_types:
+                messages.error(request, "Invalid file type. Only PDF and image files are allowed.")
+                return redirect("add_payment", pk=tenant.pk)
         
         # Validate required fields
         if not amount_paid or not date_paid or not reference_number or not payment_method:
@@ -1545,7 +1565,7 @@ def edit_payment(request, pk):
 
     return render(request, "billingApp/edit_payment.html", {
         "payment": payment,
-        "tenant": tenant_details,
+        "tenant": tenant,
         "bill": bill,
         "date_today": date_today
     })
