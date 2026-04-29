@@ -547,6 +547,21 @@ def add_bill(request, pk):
 
                 tenant.save(update_fields=["carryover_balance"])
 
+                duplicate_bill = BillingRecord.objects.filter(
+                    tenant=tenant,
+                    lease=lease,
+                    dateIssued=date_issued,
+                    billingFor=billing_for,
+                    amountDue=amountdue,
+                ).exists()
+
+                if duplicate_bill:
+                    messages.error(
+                        request,
+                        "Duplicate bill detected. A bill with the same date, amount, and billing type already exists."
+                    )
+                    return redirect("add_bill", pk=tenant.pk)
+
                 bill = BillingRecord.objects.create(
                     tenant=tenant,
                     lease=lease,
