@@ -271,9 +271,27 @@ def tenant_details(request, pk):
 
 @login_required
 def delete_tenant(request, pk):
-    t = get_object_or_404(Tenant, pk=pk)
-    Tenant.objects.filter(pk=pk).delete()
-    return redirect('tenants_main')
+    tenant = get_object_or_404(Tenant, pk=pk)
+
+    has_pending_bills = BillingRecord.objects.filter(
+        tenant=tenant,
+        status__in=[
+            BillingRecord.STATUS_UNPAID,
+            BillingRecord.STATUS_PARTIAL,
+            BillingRecord.STATUS_UNDERPAID,
+        ]
+    ).exists()
+
+    if has_pending_bills:
+        messages.error(
+            request,
+            "Cannot delete this tenant because they still have unpaid or partially paid bills."
+        )
+        return redirect("tenant_details", pk=tenant.pk)
+
+    tenant.delete()
+    messages.success(request, "Tenant deleted successfully.")
+    return redirect("tenants_main")
 
 
 @login_required
