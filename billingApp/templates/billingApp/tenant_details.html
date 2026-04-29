@@ -66,12 +66,20 @@
         <p class="is-size-5 has-text-weight-normal">End Date: <strong>{{ l.contractEnd }}</strong></p>
         <p class="is-size-5 has-text-weight-normal">Modified By: <strong>{{ l.modified_by }}</strong></p>
         <p class="is-size-5 has-text-weight-normal">Last Modified: <strong>{{ l.modified_at }}</strong></p>
+        
         <div class="columns p-4 is-justify-content-center">
           <div class="columns p-4 is-justify-content-center">
             <div class="buttons is-centered">
               <a href="{% url 'edit_lease' pk=l.pk %}" class="button">EDIT LEASE</a>
               <a href="{% url 'renew_lease' pk=l.pk %}" class="button">RENEW LEASE</a>
               <a href="{% url 'delete_lease' pk=l.pk %}" class="button is-danger">DELETE LEASE</a>
+              {% if l.leaseAttachment %}
+                <a href="{{ l.leaseAttachment.url }}" target="_blank" class="button is-info">
+                  View Lease Attachment
+                </a>
+              {% else %}
+                <span class="has-text-grey">No attachment</span>
+              {% endif %}
             </div>
           </div>
         </div>

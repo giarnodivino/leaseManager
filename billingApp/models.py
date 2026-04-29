@@ -59,7 +59,13 @@ class Lease(models.Model):
     contractStart = models.DateField()
     contractEnd = models.DateField(null=True, blank=True)
 
-    pastLease = models.BooleanField(default=False)  
+    pastLease = models.BooleanField(default=False)
+
+    leaseAttachment = models.FileField(
+        upload_to="lease_attachments/",
+        blank=True,
+        null=True
+    )
 
     class Meta:
         constraints = [

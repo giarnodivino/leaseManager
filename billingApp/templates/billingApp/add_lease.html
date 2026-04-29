@@ -14,7 +14,7 @@
       </div>
     </div>
     {% endif %}
-    <form method="POST" action="{% url 'add_lease' pk=t.id %}">
+    <form method="POST" action="{% url 'add_lease' pk=t.id %}" enctype="multipart/form-data">
       {% csrf_token %}
       <div class="columns is-justify-content-center p-4">
         <div class="column is-3 mt-3">
@@ -75,6 +75,19 @@
         <div class="column is-3">
           <label for="contractStart">Start Date:</label>
           <input type="date" class="input" id="contractStart" name="contractStart" placeholder="" />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-6">
+          <label for="leaseAttachment">Lease Attachment:</label>
+          <input
+            type="file"
+            class="input"
+            id="leaseAttachment"
+            name="leaseAttachment"
+            accept=".pdf,image/*"
+          />
+          <p class="help">Accepted files: PDF, JPG, PNG, or other image files.</p>
         </div>
       </div>
       <div class="columns is-justify-content-center">

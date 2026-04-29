@@ -36,7 +36,7 @@
       {% endif %}
     </div>
 
-    <form method="POST" action="{% url 'renew_lease' pk=lease.id %}">
+    <form method="POST" action="{% url 'renew_lease' pk=lease.pk %}" enctype="multipart/form-data">
       {% csrf_token %}
 
       <div class="columns is-justify-content-center p-4">
@@ -119,6 +119,20 @@
           <small class="has-text-grey">Enter the date the new lease will begin</small>
         </div>
       </div>
+
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-6">
+            <label for="leaseAttachment">New Lease Attachment:</label>
+            <input
+            type="file"
+            class="input"
+            id="leaseAttachment"
+            name="leaseAttachment"
+            accept=".pdf,image/*"
+            />
+            <p class="help">Accepted files: PDF, JPG, PNG, WEBP.</p>
+        </div>
+        </div>
 
       <div class="is-flex is-justify-content-center mt-5 mb-5">
         <div class="buttons">

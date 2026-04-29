@@ -308,6 +308,7 @@ def add_lease(request, pk):
         contractStart = request.POST.get("contractStart")
         signageFees = request.POST.get("signageFees")
         parkingFees = request.POST.get("parkingFees")
+        lease_attachment = request.FILES.get("leaseAttachment")
         admin_account = get_logged_in_account(request)
 
         rentAmount = float(rentAmount) if rentAmount else 0.0
@@ -357,6 +358,13 @@ def add_lease(request, pk):
             )
             return redirect("add_lease", pk=tenant.pk)
 
+        if lease_attachment:
+            allowed_types = ["application/pdf", "image/jpeg", "image/png", "image/webp"]
+
+            if lease_attachment.content_type not in allowed_types:
+                messages.error(request, "Invalid file type. Please upload a PDF or image file.")
+                return redirect("add_lease", pk=tenant.pk)
+
         Lease.objects.create(
             buildingName=selected_building,
             tenantName=tenant,
@@ -370,6 +378,7 @@ def add_lease(request, pk):
             pastLease=False,
             signageFees=signageFees,
             parkingFees=parkingFees,
+            leaseAttachment=lease_attachment,
         )
         return redirect("tenant_details", pk=tenant.pk)
 
@@ -1158,6 +1167,7 @@ def renew_lease(request, pk):
         new_parking_fees = request.POST.get("parkingFees")
         new_contract_length = request.POST.get("contractLength")
         new_contract_start = request.POST.get("contractStart")
+        lease_attachment = request.FILES.get("leaseAttachment")
         admin_account = get_logged_in_account(request)
         
         # Validate inputs
@@ -1220,6 +1230,19 @@ def renew_lease(request, pk):
             lease.modified_by = admin_account
             lease.save()
             
+            if lease_attachment:
+                allowed_types = ["application/pdf", "image/jpeg", "image/png", "image/webp"]
+
+                if lease_attachment.content_type not in allowed_types:
+                    messages.error(request, "Invalid file type. Please upload a PDF or image file.")
+                    return render(request, "billingApp/renew_lease.html", {
+                        "lease": lease,
+                        "tenant": tenant,
+                        "building": building,
+                        "unit": unit,
+                        "date_today": date_today,
+                    })
+
             # Create the new lease with updated terms
             new_lease = Lease.objects.create(
                 buildingName=building,
@@ -1234,6 +1257,7 @@ def renew_lease(request, pk):
                 contractEnd=contract_end_date,
                 pastLease=False,
                 modified_by=admin_account,
+                leaseAttachment=lease_attachment,
             )
             
             messages.success(request, "Lease renewed successfully. Previous lease has been archived.")
