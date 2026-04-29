@@ -17,7 +17,11 @@
         </div>
       <div class="column pt-5">
         <p class="">Amount:</p>
-        <input type="number" class="input" name="amount" value="{{ bill.amountDue }}" step="0.01" required />
+        <input type="number" class="input" name="amount" value="{{ bill.amountDue }}" step="0.01" required {% if bill.billingFor == 'RENT' %}disabled{% endif %} />
+        {% if bill.billingFor == 'RENT' %}
+        <input type="hidden" name="amount" value="{{ bill.amountDue }}" />
+        <small class="has-text-info">Rent amounts cannot be edited</small>
+        {% endif %}
       </div>
       <div class="column pt-5">
         <p class="">Due Date:</p>
@@ -32,14 +36,20 @@
       </div>
       <div class="column pt-5">
         <p class="">Billing For:</p>
+        {% if bill.billingFor == 'RENT' %}
+        <h2 class="is-size-4 has-text-weight-bold" style="color: rgba(41, 41, 41, 0.34)">{{ bill.get_billingFor_display }}</h2>
+        <input type="hidden" name="particulars" value="RENT" />
+        <small class="has-text-info">Rent billing type cannot be changed</small>
+        {% else %}
         <div class="select is-fullwidth">
           <select name="particulars" id="particulars" required>
             <option value="">-- Select Type --</option>
-            <option value="RENT" {% if bill.billingFor == 'RENT' %}selected{% endif %}>Rent</option>
+            <option value="RENT" disabled>Rent</option>
             <option value="ELECTRICITY" {% if bill.billingFor == 'ELECTRICITY' %}selected{% endif %}>Electricity</option>
             <option value="WATER" {% if bill.billingFor == 'WATER' %}selected{% endif %}>Water</option>
           </select>
         </div>
+        {% endif %}
       </div>
     </div>
 
@@ -55,5 +65,13 @@
     </form>
   </div>
 </div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="notification is-{{ message.tags }} mt-4">
+      {{ message }}
+    </div>
+  {% endfor %}
+{% endif %}
 
 {% endblock %}

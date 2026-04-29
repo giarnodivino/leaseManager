@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime
 
 
 def get_available_units(building_id):
@@ -994,48 +995,79 @@ def edit_bill(request, pk):
     tenant = bill.tenant
     date_today = get_date_today()
 
-    # Only allow editing if bill is not fully paid
     if bill.status == BillingRecord.STATUS_PAID:
         messages.error(request, "Cannot edit a fully paid bill.")
         return redirect("view_bills", pk=tenant.pk)
-    
+
     if request.method == "POST":
-        # Get form data from edit_bill.html and update bill accordingly
-        date_issued = request.POST.get('date_issued')
-        amount = request.POST.get('amount')
-        due_date = request.POST.get('due_date')
-        status = request.POST.get('status')
-        particulars = request.POST.get('particulars')
+        date_issued = request.POST.get("date_issued")
+        due_date = request.POST.get("due_date")
+        amount = request.POST.get("amount")
+        particulars = request.POST.get("particulars")
         admin_account = get_logged_in_account(request)
-        
+
         try:
-            # Validate required fields
-            if not date_issued or not amount or not due_date or not status or not particulars:
+            if not date_issued or not due_date:
                 messages.error(request, "Please fill in all required fields.")
-                # Refresh from database to avoid stale data
-                bill = get_object_or_404(BillingRecord, pk=pk)
-                return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill, "date_today": date_today})
-            
-            # Update all bill fields
-            from datetime import datetime
+                return render(request, "billingApp/edit_bill.html", {
+                    "tenant": tenant,
+                    "bill": bill,
+                    "date_today": date_today
+                })
+
+            # Always allow dateIssued and dateDue to be edited
             bill.dateIssued = datetime.strptime(date_issued, "%Y-%m-%d").date()
-            bill.amountDue = Decimal(amount)
             bill.dateDue = datetime.strptime(due_date, "%Y-%m-%d").date()
-            bill.status = status
-            bill.billingFor = particulars
-            
             bill.modified_by = admin_account
+
+            # If RENT, only update dates
+            if bill.billingFor == BillingRecord.RENT:
+                bill.save(update_fields=["dateIssued", "dateDue", "modified_by"])
+                messages.success(request, "Rent bill dates updated successfully.")
+                return redirect("view_bills", pk=tenant.pk)
+
+            # Non-rent bills require amount and particulars
+            if not amount or not particulars:
+                messages.error(request, "Please fill in all required fields.")
+                return render(request, "billingApp/edit_bill.html", {
+                    "tenant": tenant,
+                    "bill": bill,
+                    "date_today": date_today
+                })
+
+            # Prevent changing electricity/water into rent
+            if particulars == BillingRecord.RENT:
+                messages.error(request, "Cannot change billing type to Rent.")
+                return render(request, "billingApp/edit_bill.html", {
+                    "tenant": tenant,
+                    "bill": bill,
+                    "date_today": date_today
+                })
+
+            new_amount = Decimal(amount)
+
+            bill.amountDue = new_amount
+            bill.balance = new_amount
+            bill.billingFor = particulars
+
             bill.save()
-            
+
             messages.success(request, "Bill updated successfully.")
             return redirect("view_bills", pk=tenant.pk)
+
         except Exception as e:
             messages.error(request, f"Error updating bill: {str(e)}")
-            # Refresh from database to avoid stale data
-            bill = get_object_or_404(BillingRecord, pk=pk)
-            return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill, "date_today": date_today})
-    
-    return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill, "date_today": date_today})
+            return render(request, "billingApp/edit_bill.html", {
+                "tenant": tenant,
+                "bill": bill,
+                "date_today": date_today
+            })
+
+    return render(request, "billingApp/edit_bill.html", {
+        "tenant": tenant,
+        "bill": bill,
+        "date_today": date_today
+    })
 
 def view_payment_details(request, pk):
     payment = get_object_or_404(Payment, pk=pk)
