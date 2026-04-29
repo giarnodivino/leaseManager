@@ -14,9 +14,6 @@
         <p class="is-size-5 p-2">Last Modified: <strong>{{ b.modified_at }}</strong></p>
         <div class="columns is-justify-content-center p-4">
             <div class="column is-3">
-                <a href="" class="button">Edit Building Details</a>
-            </div>
-            <div class="column is-3">
                 <a href="{% url 'delete_building' pk=b.pk %}" class="button is-danger">DELETE BUILDING</a>
             </div>
             <div class="column is-3">

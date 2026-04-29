@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
+from django.db.models import Sum
 
 
 def get_available_units(building_id):
@@ -41,6 +42,16 @@ def calculate_total_paid():
 def get_date_today():
     from datetime import datetime
     return datetime.now().strftime("%B %d, %Y")
+
+def lease_has_pending_bills(lease):
+    return BillingRecord.objects.filter(
+        lease=lease,
+        status__in=[
+            BillingRecord.STATUS_UNPAID,
+            BillingRecord.STATUS_PARTIAL,
+            BillingRecord.STATUS_UNDERPAID,
+        ]
+    ).exists()
 
 def get_logged_in_account(request):
     if not request.user.is_authenticated:
@@ -368,12 +379,18 @@ def add_lease(request, pk):
 @login_required
 def delete_lease(request, pk):
     lease = get_object_or_404(Lease, pk=pk)
+    tenant_pk = lease.tenantName_id
 
-    tenant_pk = lease.tenantName_id  
+    if not lease.pastLease and lease_has_pending_bills(lease):
+        messages.error(
+            request,
+            "Cannot delete this active lease because it still has unpaid or partially paid bills."
+        )
+        return redirect("tenant_details", pk=tenant_pk)
 
     lease.delete()
-
-    return redirect('tenant_details', pk=tenant_pk)
+    messages.success(request, "Lease deleted successfully.")
+    return redirect("tenant_details", pk=tenant_pk)
 
 @login_required
 def billing_records_main(request):
@@ -961,16 +978,22 @@ def add_payment(request, pk):
     
     return render(request, "billingApp/add_payment.html", {"tenant": tenant, "lease": lease, "bills": bills})
 
+@login_required
 def delete_payment(request, pk):
     payment = get_object_or_404(Payment, pk=pk)
-    tenant_pk = payment.tenantID_id
+
+    tenant = payment.tenantID
     bill = payment.billingID
-    amount_paid = payment.amountPaid or Decimal("0.00")
+
     payment.delete()
 
-    # Update the bill's balance after deleting payment
-    bill.balance = (bill.balance or Decimal("0.00")) + amount_paid
-    if bill.balance >= bill.amountDue:
+    total_paid = Payment.objects.filter(billingID=bill).aggregate(
+        total=Sum("amountPaid")
+    )["total"] or Decimal("0.00")
+
+    bill.balance = bill.amountDue - total_paid
+
+    if total_paid == Decimal("0.00"):
         bill.status = BillingRecord.STATUS_UNPAID
         bill.balance = bill.amountDue
     elif bill.balance > Decimal("0.00"):
@@ -978,9 +1001,10 @@ def delete_payment(request, pk):
     else:
         bill.status = BillingRecord.STATUS_PAID
         bill.balance = Decimal("0.00")
-    bill.save()
 
-    return redirect("view_payments", pk=tenant_pk)
+    bill.save(update_fields=["status", "balance"])
+
+    return redirect("view_bills", pk=tenant.pk)
 
 def delete_bill(request, pk):
     bill = get_object_or_404(BillingRecord, pk=pk)
@@ -1091,6 +1115,14 @@ def renew_lease(request, pk):
     """
     lease = get_object_or_404(Lease, pk=pk)
     tenant = lease.tenantName
+
+    if not lease.pastLease and lease_has_pending_bills(lease):
+        messages.error(
+            request,
+            "Cannot renew/archive this lease because it still has unpaid or partially paid bills."
+        )
+        return redirect("tenant_details", pk=tenant.pk)
+
     building = lease.buildingName
     unit = lease.unitID
     date_today = get_date_today()
@@ -1192,6 +1224,7 @@ def renew_lease(request, pk):
                 "building": building,
                 "unit": unit,
             })
+    
     
     # Display the form pre-populated with current lease information
     return render(request, "billingApp/renew_lease.html", {

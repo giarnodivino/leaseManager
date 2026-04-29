@@ -90,7 +90,7 @@
               <td>{{ payment.subAccountName }}</td>
               <td>{{ payment.datePaid }}</td>
               <td>
-                <a href="{% url 'payment_details' pk=payment.pk %}" class="button is-small">Edit Details</a>
+                <a href="{% url 'payment_details' pk=payment.pk %}" class="button is-small">View Details</a>
               </td>
               <td>
                 <a href="{% url 'delete_payment' pk=payment.pk %}" class="button is-small is-danger">Delete</a>

@@ -33,5 +33,6 @@ urlpatterns = [
     path('renew_lease/<int:pk>/', views.renew_lease, name='renew_lease'),
     path('edit_tenant/<int:pk>/', views.edit_tenant, name='edit_tenant'),
     path('edit_lease/<int:pk>/', views.edit_lease, name='edit_lease'),
-    path('edit_payment/<int:pk>/', views.edit_payment, name='edit_payment')
+    path('edit_payment/<int:pk>/', views.edit_payment, name='edit_payment'),
+    path('delete_payment/<int:pk>/', views.delete_payment, name='delete_payment'),
 ]

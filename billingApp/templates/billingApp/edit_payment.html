@@ -74,6 +74,9 @@
 
           <div class="field is-grouped is-grouped-centered">
             <p class="control">
+              <a href="{% url 'delete_payment' pk=payment.pk %}" class="button is-warning">Delete Payment</a>
+            </p>
+            <p class="control">
               <button type="submit" class="button is-primary">Update Payment</button>
             </p>
             <p class="control">
