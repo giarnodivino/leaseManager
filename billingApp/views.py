@@ -494,7 +494,7 @@ def add_bill(request, pk):
 
     lease = (
         Lease.objects
-        .filter(tenantName=tenant)
+        .filter(tenantName=tenant, pastLease=False)
         .order_by("-contractStart")
         .first()
     )
@@ -1124,3 +1124,35 @@ def renew_lease(request, pk):
         "building": building,
         "unit": unit,
     })
+
+def edit_tenant(request, pk):
+    tenant = get_object_or_404(Tenant, pk=pk)
+
+    if request.method == "POST":
+        company_name = request.POST.get("company_name")
+        contact_person = request.POST.get("contact_person")
+        email = request.POST.get("email")
+        phone_number = request.POST.get("phone_number")
+
+        if not company_name:
+            tenant.companyName = tenant.companyName
+        else:
+            tenant.companyName = company_name
+        if not contact_person:
+            tenant.contactPerson = tenant.contactPerson
+        else:
+            tenant.contactPerson = contact_person
+        if not email:
+            tenant.email = tenant.email
+        else:
+            tenant.email = email
+        if not phone_number:
+            tenant.phoneNumber = tenant.phoneNumber
+        else:
+            tenant.phoneNumber = phone_number
+        
+        tenant.save()
+
+        return redirect("tenant_details", pk=tenant.pk)
+
+    return render(request, "billingApp/edit_tenant.html", {"tenant": tenant})

@@ -37,7 +37,7 @@
     </div>
     <div class="columns">
       <div class="column">
-        <p class="is-size-5 has-text-weight-normal">Contact Person: {{t.contactPerson}}</p>
+        <p class="is-size-5 has-text-weight-normal">Contact Person: <strong>{{t.contactPerson}}</strong></p>
         <p class="is-size-5 p-2">
           Phone Number:
           <strong>{{t.phoneNumber}}</strong>
@@ -50,7 +50,7 @@
         <p class="is-size-5 p-2">Last Modified: <strong>{{ t.modified_at }}</strong></p>
         <div class="columns p-4 mt-5 is-justify-content-center">
           <div class="buttons is-centered">
-            <a href="" class="button">EDIT TENANT</a>
+            <a href="{% url 'edit_tenant' pk=t.pk %}" class="button">EDIT TENANT</a>
             <a href="{% url 'delete_tenant' pk=t.pk %}" class="button is-danger">DELETE TENANT</a>
           </div>
         </div>

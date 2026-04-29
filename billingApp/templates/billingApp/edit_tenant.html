@@ -1,0 +1,54 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+</div>
+<!-- Edit tenant details by showing first the current details then providing an edit form -->
+<div class="card card2">
+    <div class="card-content has-text-centered">
+        <h1 class="is-size-3 has-text-weight-bold p-5 mt-6">Edit Tenant Details</h1>
+        <form method="POST" action="{% url 'edit_tenant' pk=tenant.pk %}">
+            {% csrf_token %}
+            <div class="columns is-justify-content-center p-4">
+                <div class="column is-3">
+                    <label for="company_name">Company Name:</label>
+                    <input type="text" class="input" id="company_name" name="company_name" placeholder="{{ tenant.companyName }}" />
+                </div>
+                <div class="column is-3">
+                    <label for="phone_number">Phone Number:</label>
+                    <input type="text" class="input" id="phone_number" name="phone_number" placeholder="{{ tenant.phoneNumber }}" />
+                </div>
+            </div>
+            <div class="columns is-justify-content-center p-4">
+                <div class="column is-3">
+                    <label for="contact_person">Contact Person:</label>
+                    <input type="text" class="input" id="contact_person" name="contact_person" placeholder="{{ tenant.contactPerson }}" />
+                </div>
+                <div class="column is-3">
+                    <label for="email">Email:</label>
+                    <input type="email" class="input" id="email" name="email" placeholder="{{ tenant.email }}" />
+                </div>
+            </div>
+            <div class="columns is-justify-content-center p-4">
+                <div class="column is-3">
+                    <button type="submit" class="button is-primary">Update Tenant Details</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <!-- Back button -->
+    <div class="columns is-justify-content-center p-4">
+        <div class="column is-12">
+            <a class="button" href="{% url 'tenant_details' pk=tenant.pk %}">Back</a>
+        </div>
+    </div>
+</div>
+{% if messages %}
+    <div class="columns is-justify-content-center p-4">
+        <div class="column is-6">
+            {% for message in messages %}
+                <div class="notification is-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
