@@ -242,6 +242,14 @@ def add_tenant(request):
         else:
             companyName = None
 
+        if companyName and Tenant.objects.filter(companyName__iexact=companyName).exists():
+            messages.error(request, "A tenant with this company name already exists.")
+            return redirect("add_tenant")
+
+        if contactPerson and Tenant.objects.filter(contactPerson__iexact=contactPerson).exists():
+            messages.error(request, "A tenant with this contact person name already exists.")
+            return redirect("add_tenant")
+
         Tenant.objects.create(companyName=companyName, contactPerson=contactPerson, 
                                 phoneNumber=phoneNumber, email=email,
                                 modified_by=admin_account)
@@ -1261,19 +1269,55 @@ def edit_tenant(request, pk):
         phone_number = request.POST.get("phone_number")
 
         try:
-            # Validate required fields
-            if not contact_person or not email or not phone_number:
-                messages.error(request, "Please fill in all required fields.")
-                # Refresh from database to avoid stale data
-                tenant = get_object_or_404(Tenant, pk=pk)
-                return render(request, "billingApp/edit_tenant.html", {"tenant": tenant, "date_today": date_today})
-            
-            # Update all tenant fields
-            tenant.companyName = company_name if company_name else tenant.companyName
-            tenant.contactPerson = contact_person
-            tenant.email = email
-            tenant.phoneNumber = phone_number
-            
+            company_name = (company_name or "").strip()
+            contact_person = (contact_person or "").strip()
+            email = (email or "").strip()
+            phone_number = (phone_number or "").strip()
+
+            # Check if ALL fields are empty
+            if not any([company_name, contact_person, email, phone_number]):
+                messages.error(request, "Please enter at least one field to update.")
+                return render(request, "billingApp/edit_tenant.html", {
+                    "tenant": tenant,
+                    "date_today": date_today
+                })
+
+            # Duplicate checks ONLY if field is being updated
+            if company_name:
+                duplicate_tenant = Tenant.objects.exclude(pk=tenant.pk).filter(
+                    companyName__iexact=company_name
+                ).exists()
+                if duplicate_tenant:
+                    messages.error(request, "Another tenant already has this company name.")
+                    return render(request, "billingApp/edit_tenant.html", {
+                        "tenant": tenant,
+                        "date_today": date_today
+                    })
+
+            if contact_person:
+                duplicate_contact = Tenant.objects.exclude(pk=tenant.pk).filter(
+                    contactPerson__iexact=contact_person
+                ).exists()
+                if duplicate_contact:
+                    messages.error(request, "Another tenant already has this contact person name.")
+                    return render(request, "billingApp/edit_tenant.html", {
+                        "tenant": tenant,
+                        "date_today": date_today
+                    })
+
+            # Update ONLY fields that were filled
+            if company_name:
+                tenant.companyName = company_name
+
+            if contact_person:
+                tenant.contactPerson = contact_person
+
+            if email:
+                tenant.email = email
+
+            if phone_number:
+                tenant.phoneNumber = phone_number
+
             admin_account = get_logged_in_account(request)
             tenant.modified_by = admin_account
             tenant.save()
