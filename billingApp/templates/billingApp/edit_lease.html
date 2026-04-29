@@ -1,0 +1,217 @@
+{% extends "billingApp/base.html" %} {% load static %} {% block content %}
+</div>
+<div class="card">
+  <div class="card-content has-text-centered">
+    <h1 class="is-size-3 has-text-weight-bold p-5 mt-6">Edit Lease Details</h1>
+    
+    <form method="POST" action="{% url 'edit_lease' pk=lease.pk %}">
+      {% csrf_token %}
+      <div class="columns is-justify-content-center p-4">
+        <div class="column is-3 mt-3">
+          <div class="select is-fullwidth is-medium is-info">
+            <select name="building_id" id="building_id" required>
+              <option value="">Select Building</option>
+              {% for b in buildings %}
+              <option value="{{ b.id }}" {% if b.id == lease.buildingName.id %}selected{% endif %}>{{ b.buildingName }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="column is-3 mt-3">
+          <div class="select is-fullwidth is-medium is-info">
+            <select name="unitID" id="unitID" required>
+              <option value="">Select Unit</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-3">
+          <label for="rentAmount">Monthly Rent *</label>
+          <input
+            type="number"
+            class="input"
+            id="rentAmount"
+            name="rentAmount"
+            step="0.01"
+            min="0"
+            placeholder="Amount in PHP"
+            value="{{ lease.rentAmount }}"
+            required
+          />
+        </div>
+        <div class="column is-3">
+          <label for="vatAmount">VAT Amount (Auto-calculated):</label>
+          <input
+            type="number"
+            step="0.01"
+            class="input"
+            id="vatAmount"
+            name="vatAmount"
+            placeholder="Auto-calculated"
+            value="{{ lease.vatAmount }}"
+            readonly
+          />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-3">
+          <label for="parkingFees">Parking Fees:</label>
+          <input
+            type="number"
+            class="input"
+            id="parkingFees"
+            name="parkingFees"
+            min="0"
+            step="0.01"
+            placeholder="Amount in PHP"
+            value="{{ lease.parkingFees }}"
+          />
+        </div>
+        <div class="column is-3">
+          <label for="signageFees">Signage Fees:</label>
+          <input
+            type="number"
+            class="input"
+            id="signageFees"
+            name="signageFees"
+            min="0"
+            step="0.01"
+            placeholder="Amount in PHP"
+            value="{{ lease.signageFees }}"
+          />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center align-content-center p-4">
+        <div class="column is-3">
+          <label for="contractLength">Contract Length:</label>
+          <div class="select is-fullwidth">
+            <select id="contractLength" name="contractLength" required>
+              <option value="">Select Length</option>
+              <option value="6" {% if lease.contractLength == 6 %}selected{% endif %}>6 Months</option>
+              <option value="12" {% if lease.contractLength == 12 %}selected{% endif %}>12 Months</option>
+            </select>
+          </div>
+        </div>
+        <div class="column is-3">
+          <label for="contractStart">Start Date:</label>
+          <input
+            type="date"
+            class="input"
+            id="contractStart"
+            name="contractStart"
+            value="{{ lease.contractStart|date:'Y-m-d' }}"
+            required
+          />
+        </div>
+      </div>
+      <div class="columns is-justify-content-center p-4">
+        <div class="column is-3">
+          <button type="submit" class="button is-primary">Update Lease</button>
+        </div>
+      </div>
+      {% if messages %}
+<div class="columns is-justify-content-center p-4">
+  <div class="column is-6">
+    {% for message in messages %}
+    <div class="notification is-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+    </form>
+  </div>
+  <!-- Back button -->
+  <div class="columns is-justify-content-center p-4">
+    <div class="column is-12">
+      <a class="button" href="{% url 'tenant_details' pk=lease.tenantName.pk %}">Back</a>
+    </div>
+  </div>
+</div>
+
+
+{{ units_payload|json_script:"lease-units-data" }}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const buildingSelect = document.getElementById("building_id");
+    const unitSelect = document.getElementById("unitID");
+    const rentAmountInput = document.getElementById("rentAmount");
+    const vatAmountInput = document.getElementById("vatAmount");
+    const unitDataNode = document.getElementById("lease-units-data");
+    const allUnits = unitDataNode ? JSON.parse(unitDataNode.textContent) : [];
+    const currentUnitId = "{{ lease.unitID.id }}";
+    const currentBuildingId = "{{ lease.buildingName.id }}";
+
+    // VAT auto-calculation
+    function calculateVAT() {
+      const rentAmount = parseFloat(rentAmountInput.value) || 0;
+      const vatAmount = rentAmount * 0.12;
+      vatAmountInput.value = vatAmount.toFixed(2);
+    }
+
+    rentAmountInput.addEventListener("input", calculateVAT);
+
+    // Unit filtering based on building
+    function resetUnitSelect(message) {
+      unitSelect.innerHTML = "";
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = message;
+      option.disabled = true;
+      option.selected = true;
+      unitSelect.appendChild(option);
+      unitSelect.disabled = true;
+    }
+
+    function populateUnits(buildingId) {
+      const filteredUnits = allUnits.filter(function (unit) {
+        return String(unit.building_id) === String(buildingId);
+      });
+
+      if (filteredUnits.length === 0) {
+        resetUnitSelect("No units available");
+        return;
+      }
+
+      unitSelect.innerHTML = "";
+
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Select a unit";
+      placeholder.disabled = true;
+      unitSelect.appendChild(placeholder);
+
+      filteredUnits.forEach(function (unit) {
+        const option = document.createElement("option");
+        option.value = unit.id;
+        option.textContent = unit.unitID;
+        if (String(unit.id) === currentUnitId) {
+          option.selected = true;
+        }
+        unitSelect.appendChild(option);
+      });
+
+      unitSelect.disabled = false;
+    }
+
+    // Initialize on page load
+    if (currentBuildingId) {
+      populateUnits(currentBuildingId);
+    } else {
+      resetUnitSelect("Select building first");
+    }
+
+    buildingSelect.addEventListener("change", function () {
+      if (!buildingSelect.value) {
+        resetUnitSelect("Select building first");
+        return;
+      }
+      populateUnits(buildingSelect.value);
+    });
+
+    // Initialize VAT on page load
+    calculateVAT();
+  });
+</script>
+
+{% endblock %}

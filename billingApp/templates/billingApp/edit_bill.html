@@ -28,15 +28,7 @@
     <div class="columns">
       <div class="column pt-5">
         <p class="">Status:</p>
-        <div class="select is-fullwidth">
-          <select name="status" id="status" required>
-            <option value="">-- Select Status --</option>
-            <option value="UNPAID" {% if bill.status == 'UNPAID' %}selected{% endif %}>Unpaid</option>
-            <option value="PAID" {% if bill.status == 'PAID' %}selected{% endif %}>Paid</option>
-            <option value="UNDERPAID" {% if bill.status == 'UNDERPAID' %}selected{% endif %}>Underpaid</option>
-            <option value="OVERPAID" {% if bill.status == 'OVERPAID' %}selected{% endif %}>Overpaid</option>
-          </select>
-        </div>
+        <h2 class="is-size-4 has-text-weight-bold" style="color: rgba(41, 41, 41, 0.34)">{{ bill.status }}</h2>
       </div>
       <div class="column pt-5">
         <p class="">Billing For:</p>

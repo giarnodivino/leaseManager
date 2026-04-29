@@ -32,4 +32,5 @@ urlpatterns = [
     path('view_proof_of_payment/<int:pk>/', views.view_proof_of_payment, name='view_proof_of_payment'),
     path('renew_lease/<int:pk>/', views.renew_lease, name='renew_lease'),
     path('edit_tenant/<int:pk>/', views.edit_tenant, name='edit_tenant'),
+    path('edit_lease/<int:pk>/', views.edit_lease, name='edit_lease'),
 ]

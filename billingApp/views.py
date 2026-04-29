@@ -988,6 +988,7 @@ def delete_bill(request, pk):
 def edit_bill(request, pk):
     bill = get_object_or_404(BillingRecord, pk=pk)
     tenant = bill.tenant
+    date_today = get_date_today()
 
     # Only allow editing if bill is not fully paid
     if bill.status == BillingRecord.STATUS_PAID:
@@ -1023,9 +1024,9 @@ def edit_bill(request, pk):
             return redirect("view_bills", pk=tenant.pk)
         except Exception as e:
             messages.error(request, f"Error updating bill: {str(e)}")
-            return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill})
+            return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill, "date_today": date_today})
     
-    return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill})
+    return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill, "date_today": date_today})
 
 def view_payment_details(request, pk):
     payment = get_object_or_404(Payment, pk=pk)
@@ -1037,8 +1038,9 @@ def view_payment_details(request, pk):
 def view_proof_of_payment(request, pk):
     payment = get_object_or_404(Payment, pk=pk)
     tenant = payment.tenantID
+    date_today = get_date_today()
     
-    return render(request, "billingApp/view_proof_of_payment.html", {"payment": payment, "tenant": tenant})
+    return render(request, "billingApp/view_proof_of_payment.html", {"payment": payment, "tenant": tenant, "date_today": date_today})
 
 @login_required
 def renew_lease(request, pk):
@@ -1050,6 +1052,7 @@ def renew_lease(request, pk):
     tenant = lease.tenantName
     building = lease.buildingName
     unit = lease.unitID
+    date_today = get_date_today()
     
     if request.method == "POST":
         # Get the new lease terms from the form
@@ -1064,6 +1067,38 @@ def renew_lease(request, pk):
         # Validate inputs
         if not new_contract_start or not new_contract_length:
             messages.error(request, "Please provide both contract start date and contract length.")
+            return render(request, "billingApp/renew_lease.html", {
+                "lease": lease,
+                "tenant": tenant,
+                "building": building,
+                "unit": unit,
+            })
+        
+        # Validate contract start date is not older than allowed based on contract length
+        from datetime import datetime, timedelta
+        try:
+            contract_start_date = datetime.strptime(new_contract_start, "%Y-%m-%d").date()
+            contract_length = int(new_contract_length)
+            today = datetime.now().date()
+            
+            # Calculate the oldest allowed start date based on contract length
+            if contract_length == 6:
+                oldest_allowed_date = today - timedelta(days=6*30)
+            elif contract_length == 12:
+                oldest_allowed_date = today - timedelta(days=12*30)
+            else:
+                oldest_allowed_date = today - timedelta(days=contract_length*30)
+            
+            if contract_start_date < oldest_allowed_date:
+                messages.error(request, f"For a {contract_length}-month contract, the start date cannot be earlier than {oldest_allowed_date.strftime('%B %d, %Y')}.")
+                return render(request, "billingApp/renew_lease.html", {
+                    "lease": lease,
+                    "tenant": tenant,
+                    "building": building,
+                    "unit": unit,
+                })
+        except ValueError:
+            messages.error(request, "Invalid date format. Please use YYYY-MM-DD.")
             return render(request, "billingApp/renew_lease.html", {
                 "lease": lease,
                 "tenant": tenant,
@@ -1123,10 +1158,12 @@ def renew_lease(request, pk):
         "tenant": tenant,
         "building": building,
         "unit": unit,
+        "date_today": date_today,
     })
 
 def edit_tenant(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
+    date_today = get_date_today()
 
     if request.method == "POST":
         company_name = request.POST.get("company_name")
@@ -1155,4 +1192,117 @@ def edit_tenant(request, pk):
 
         return redirect("tenant_details", pk=tenant.pk)
 
-    return render(request, "billingApp/edit_tenant.html", {"tenant": tenant})
+    return render(request, "billingApp/edit_tenant.html", {"tenant": tenant, "date_today": date_today})
+
+def edit_lease(request, pk):
+    lease = get_object_or_404(Lease, pk=pk)
+    tenant = lease.tenantName
+    building = lease.buildingName
+    unit = lease.unitID
+    date_today = get_date_today()
+    
+    building_objects = Building.objects.all().order_by("buildingName")
+    active_leased_unit_ids = Lease.objects.filter(pastLease=False).exclude(pk=lease.pk).values_list("unitID_id", flat=True)
+    units = (
+        Units.objects.select_related("building")
+        .exclude(pk__in=active_leased_unit_ids)
+        .order_by("building__buildingName", "unitID")
+    )
+    units_payload = [
+        {
+            "id": unit.id,
+            "unitID": unit.unitID,
+            "building_id": unit.building_id,
+        }
+        for unit in units
+    ]
+
+    if request.method == "POST":
+        building_id = request.POST.get("building_id")
+        unit_id = request.POST.get("unitID")
+        rent_amount = request.POST.get("rentAmount")
+        vat_amount = request.POST.get("vatAmount")
+        signage_fees = request.POST.get("signageFees")
+        parking_fees = request.POST.get("parkingFees")
+        contract_length = request.POST.get("contractLength")
+        contract_start = request.POST.get("contractStart")
+
+        # Validate contract start date is not older than allowed based on contract length
+        if contract_start and contract_length:
+            from datetime import datetime, timedelta
+            try:
+                start_date = datetime.strptime(contract_start, "%Y-%m-%d").date()
+                length = int(contract_length)
+                today = datetime.now().date()
+                
+                # Calculate the oldest allowed start date based on contract length
+                if length == 6:
+                    oldest_allowed_date = today - timedelta(days=6*30)
+                elif length == 12:
+                    oldest_allowed_date = today - timedelta(days=12*30)
+                else:
+                    oldest_allowed_date = today - timedelta(days=length*30)
+                
+                if start_date < oldest_allowed_date:
+                    messages.error(request, f"For a {length}-month contract, the start date cannot be earlier than {oldest_allowed_date.strftime('%B %d, %Y')}.")
+                    return render(request, "billingApp/edit_lease.html", {
+                        "lease": lease,
+                        "tenant": tenant,
+                        "building": building,
+                        "units_payload": units_payload,
+                        "building_objects": building_objects,
+                    })
+            except ValueError:
+                messages.error(request, "Invalid date format. Please use YYYY-MM-DD.")
+                return render(request, "billingApp/edit_lease.html", {
+                    "lease": lease,
+                    "tenant": tenant,
+                    "building": building,
+                    "units_payload": units_payload,
+                    "building_objects": building_objects,
+                })
+
+        if building_id:
+            selected_building = Building.objects.filter(pk=building_id).first()
+            if selected_building:
+                lease.buildingName = selected_building
+        
+        if unit_id:
+            selected_unit = Units.objects.filter(pk=unit_id).first()
+            if selected_unit:
+                lease.unitID = selected_unit
+
+        if rent_amount:
+            lease.rentAmount = float(rent_amount)
+        if vat_amount:
+            lease.vatAmount = float(vat_amount)
+        if signage_fees:
+            lease.signageFees = float(signage_fees)
+        if parking_fees:
+            lease.parkingFees = float(parking_fees)
+        if contract_length:
+            lease.contractLength = int(contract_length)
+        if contract_start:
+            from datetime import datetime
+            lease.contractStart = datetime.strptime(contract_start, "%Y-%m-%d").date()
+        
+        # Recalculate contract end date based on new contract start and length
+        if contract_start and contract_length:
+            from datetime import timedelta
+            lease.contractEnd = lease.contractStart + timedelta(days=lease.contractLength * 30)
+
+        admin_account = get_logged_in_account(request)
+        lease.modified_by = admin_account
+        lease.save()
+
+        return redirect("tenant_details", pk=tenant.pk)
+
+    return render(request, "billingApp/edit_lease.html", {
+        "lease": lease,
+        "tenant": tenant,
+        "building": building,
+        "unit": unit,
+        "buildings": building_objects,
+        "units_payload": units_payload,
+        "date_today": date_today,
+    })
