@@ -1,0 +1,99 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+</div>
+<div class="card card2">
+  <div class="card-content">
+    <p class="is-size-6 has-text-centered">Tenant: {{ tenant.companyName|default:tenant.contactPerson }}</p>
+    <h1 class="is-size-4 has-text-weight-bold has-text-centered pb-5">Edit Payment - Reference: {{ payment.referenceNumber }}</h1>
+    
+    <div class="columns">
+      <div class="column">
+        <p class="is-size-5 mt-3">Payment Details:</p>
+        <br />
+        <p class="is-size-5"><strong>Bill ID:</strong> {{ bill.pk }}</p>
+        <p class="is-size-5"><strong>Billing For:</strong> {{ bill.billingFor }}</p>
+        <p class="is-size-5"><strong>Amount Due:</strong> ₱ {{ bill.amountDue }}</p>
+        <p class="is-size-5"><strong>Date Issued:</strong> {{ bill.dateIssued }}</p>
+        <p class="is-size-5"><strong>Status:</strong> {{ bill.status }}</p>
+      </div>
+
+      <div class="column">
+        <form method="POST" action="{% url 'edit_payment' pk=payment.pk %}" enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <div class="field">
+            <label class="label">Amount Paid: *</label>
+            <div class="control">
+              <input type="number" class="input" name="amountPaid" id="amountPaid" step="0.01" min="0" value="{{ payment.amountPaid }}" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Date Paid: *</label>
+            <div class="control">
+              <input type="date" class="input" name="datePaid" id="datePaid" value="{% if payment.datePaid %}{{ payment.datePaid|date:'Y-m-d' }}{% endif %}" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Payment ID/Reference Number: *</label>
+            <div class="control">
+              <input type="text" class="input" name="referenceNumber" id="referenceNumber" value="{{ payment.referenceNumber }}" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Payment Method: *</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select name="paymentMethod" id="paymentMethod" required>
+                  <option value="" disabled>Select a payment method</option>
+                  <option value="CASH" {% if payment.paymentMethod == 'CASH' %}selected{% endif %}>Cash</option>
+                  <option value="PDC" {% if payment.paymentMethod == 'PDC' %}selected{% endif %}>PDC</option>
+                  <option value="BANK_TRANSFER" {% if payment.paymentMethod == 'BANK_TRANSFER' %}selected{% endif %}>Bank Transfer</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Sub-Account Name:</label>
+            <div class="control">
+              <input type="text" class="input" name="subAccountName" id="subAccountName" value="{{ payment.subAccountName|default:'' }}" placeholder="Optional" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label">Proof of Payment:</label>
+            <div class="control">
+              <input type="file" class="input" name="proofOfPayment" id="proofOfPayment" />
+            </div>
+            {% if payment.proofOfPayment %}
+            <p class="help">Current file: <a href="{{ payment.proofOfPayment.url }}" target="_blank">{{ payment.proofOfPayment.name }}</a></p>
+            {% endif %}
+          </div>
+
+          <div class="field is-grouped is-grouped-centered">
+            <p class="control">
+              <button type="submit" class="button is-primary">Update Payment</button>
+            </p>
+            <p class="control">
+              <a href="{% url 'payment_details' pk=payment.pk %}" class="button is-light">Cancel</a>
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="message is-danger">
+  {% if messages %}
+  <ul class="messages message-header">
+    {% for message in messages %}
+    <li {% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+
+{% endblock %}

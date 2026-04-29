@@ -638,13 +638,17 @@ def payments_main(request):
 def view_payments(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
     payments = Payment.objects.filter(tenantID=tenant).order_by("-id")
+    # get the bill for each payment and save the billingFor value to payment object for access to it in template
+    for payment in payments:
+        bill = BillingRecord.objects.filter(id=payment.billingID_id).first()
+        payment.billingFor = bill.billingFor if bill else "N/A"
+        # save the billingFor and name it subAccountName
+        payment.subAccountName = bill.billingFor if bill else "N/A"
 
     if not (tenant.companyName or "").strip():
         tenant.companyName_display = tenant.contactPerson
     else:
         tenant.companyName_display = tenant.companyName
-
-    
 
     return render(request, 'billingApp/view_payments.html', {"tenant": tenant, "payments": payments})
 
@@ -1005,17 +1009,20 @@ def edit_bill(request, pk):
         admin_account = get_logged_in_account(request)
         
         try:
-            # Update bill fields
-            if date_issued:
-                bill.dateIssued = date_issued
-            if amount:
-                bill.amountDue = Decimal(amount)
-            if due_date:
-                bill.dateDue = due_date
-            if status:
-                bill.status = status
-            if particulars:
-                bill.billingFor = particulars
+            # Validate required fields
+            if not date_issued or not amount or not due_date or not status or not particulars:
+                messages.error(request, "Please fill in all required fields.")
+                # Refresh from database to avoid stale data
+                bill = get_object_or_404(BillingRecord, pk=pk)
+                return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill, "date_today": date_today})
+            
+            # Update all bill fields
+            from datetime import datetime
+            bill.dateIssued = datetime.strptime(date_issued, "%Y-%m-%d").date()
+            bill.amountDue = Decimal(amount)
+            bill.dateDue = datetime.strptime(due_date, "%Y-%m-%d").date()
+            bill.status = status
+            bill.billingFor = particulars
             
             bill.modified_by = admin_account
             bill.save()
@@ -1024,6 +1031,8 @@ def edit_bill(request, pk):
             return redirect("view_bills", pk=tenant.pk)
         except Exception as e:
             messages.error(request, f"Error updating bill: {str(e)}")
+            # Refresh from database to avoid stale data
+            bill = get_object_or_404(BillingRecord, pk=pk)
             return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill, "date_today": date_today})
     
     return render(request, "billingApp/edit_bill.html", {"tenant": tenant, "bill": bill, "date_today": date_today})
@@ -1171,26 +1180,31 @@ def edit_tenant(request, pk):
         email = request.POST.get("email")
         phone_number = request.POST.get("phone_number")
 
-        if not company_name:
-            tenant.companyName = tenant.companyName
-        else:
-            tenant.companyName = company_name
-        if not contact_person:
-            tenant.contactPerson = tenant.contactPerson
-        else:
+        try:
+            # Validate required fields
+            if not contact_person or not email or not phone_number:
+                messages.error(request, "Please fill in all required fields.")
+                # Refresh from database to avoid stale data
+                tenant = get_object_or_404(Tenant, pk=pk)
+                return render(request, "billingApp/edit_tenant.html", {"tenant": tenant, "date_today": date_today})
+            
+            # Update all tenant fields
+            tenant.companyName = company_name if company_name else tenant.companyName
             tenant.contactPerson = contact_person
-        if not email:
-            tenant.email = tenant.email
-        else:
             tenant.email = email
-        if not phone_number:
-            tenant.phoneNumber = tenant.phoneNumber
-        else:
             tenant.phoneNumber = phone_number
-        
-        tenant.save()
-
-        return redirect("tenant_details", pk=tenant.pk)
+            
+            admin_account = get_logged_in_account(request)
+            tenant.modified_by = admin_account
+            tenant.save()
+            
+            messages.success(request, "Tenant updated successfully.")
+            return redirect("tenant_details", pk=tenant.pk)
+        except Exception as e:
+            messages.error(request, f"Error updating tenant: {str(e)}")
+            # Refresh from database to avoid stale data
+            tenant = get_object_or_404(Tenant, pk=pk)
+            return render(request, "billingApp/edit_tenant.html", {"tenant": tenant, "date_today": date_today})
 
     return render(request, "billingApp/edit_tenant.html", {"tenant": tenant, "date_today": date_today})
 
@@ -1272,30 +1286,46 @@ def edit_lease(request, pk):
             if selected_unit:
                 lease.unitID = selected_unit
 
-        if rent_amount:
-            lease.rentAmount = float(rent_amount)
-        if vat_amount:
-            lease.vatAmount = float(vat_amount)
-        if signage_fees:
-            lease.signageFees = float(signage_fees)
-        if parking_fees:
-            lease.parkingFees = float(parking_fees)
-        if contract_length:
-            lease.contractLength = int(contract_length)
-        if contract_start:
-            from datetime import datetime
-            lease.contractStart = datetime.strptime(contract_start, "%Y-%m-%d").date()
-        
-        # Recalculate contract end date based on new contract start and length
-        if contract_start and contract_length:
-            from datetime import timedelta
-            lease.contractEnd = lease.contractStart + timedelta(days=lease.contractLength * 30)
+        try:
+            # Update all lease fields
+            if rent_amount:
+                lease.rentAmount = Decimal(rent_amount)
+            if vat_amount:
+                lease.vatAmount = Decimal(vat_amount)
+            if signage_fees:
+                lease.signageFees = Decimal(signage_fees) if signage_fees else None
+            if parking_fees:
+                lease.parkingFees = Decimal(parking_fees) if parking_fees else None
+            if contract_length:
+                lease.contractLength = int(contract_length)
+            if contract_start:
+                from datetime import datetime
+                lease.contractStart = datetime.strptime(contract_start, "%Y-%m-%d").date()
+            
+            # Recalculate contract end date based on new contract start and length
+            if contract_start and contract_length:
+                from datetime import timedelta
+                lease.contractEnd = lease.contractStart + timedelta(days=lease.contractLength * 30)
 
-        admin_account = get_logged_in_account(request)
-        lease.modified_by = admin_account
-        lease.save()
-
-        return redirect("tenant_details", pk=tenant.pk)
+            admin_account = get_logged_in_account(request)
+            lease.modified_by = admin_account
+            lease.save()
+            
+            messages.success(request, "Lease updated successfully.")
+            return redirect("tenant_details", pk=tenant.pk)
+        except Exception as e:
+            messages.error(request, f"Error updating lease: {str(e)}")
+            # Refresh from database to avoid stale data
+            lease = get_object_or_404(Lease, pk=pk)
+            return render(request, "billingApp/edit_lease.html", {
+                "lease": lease,
+                "tenant": lease.tenantName,
+                "building": lease.buildingName,
+                "unit": lease.unitID,
+                "buildings": building_objects,
+                "units_payload": units_payload,
+                "date_today": date_today,
+            })
 
     return render(request, "billingApp/edit_lease.html", {
         "lease": lease,
@@ -1305,4 +1335,69 @@ def edit_lease(request, pk):
         "buildings": building_objects,
         "units_payload": units_payload,
         "date_today": date_today,
+    })
+
+def edit_payment(request, pk):
+    payment = get_object_or_404(Payment, pk=pk)
+    tenant_details = payment.tenantID
+    bill = payment.billingID
+    date_today = get_date_today()
+    
+    if request.method == "POST":
+        amount_paid = request.POST.get("amountPaid")
+        date_paid = request.POST.get("datePaid")
+        reference_number = request.POST.get("referenceNumber")
+        payment_method = request.POST.get("paymentMethod")
+        sub_account_name = request.POST.get("subAccountName")
+        proof_of_payment = request.FILES.get("proofOfPayment")
+        
+        # Validate required fields
+        if not amount_paid or not date_paid or not reference_number or not payment_method:
+            messages.error(request, "Please fill in all required fields.")
+            # Refresh from database to avoid stale data
+            payment = get_object_or_404(Payment, pk=pk)
+            return render(request, "billingApp/edit_payment.html", {
+                "payment": payment,
+                "tenant": payment.tenantID,
+                "bill": payment.billingID,
+                "date_today": date_today,
+            })
+        
+        try:
+            # Update all payment fields
+            from datetime import datetime
+            
+            payment.amountPaid = Decimal(amount_paid)
+            payment.datePaid = datetime.strptime(date_paid, "%Y-%m-%d").date()
+            payment.referenceNumber = reference_number
+            payment.paymentMethod = payment_method
+            payment.subAccountName = sub_account_name if sub_account_name else None
+            
+            # Update proof of payment if a new file is provided
+            if proof_of_payment:
+                payment.proofOfPayment = proof_of_payment
+            
+            admin_account = get_logged_in_account(request)
+            payment.modified_by = admin_account
+            payment.save()
+            
+            messages.success(request, "Payment updated successfully.")
+            return redirect("payment_details", pk=payment.pk)
+            
+        except Exception as e:
+            messages.error(request, f"Error updating payment: {str(e)}")
+            # Refresh from database to avoid stale data
+            payment = get_object_or_404(Payment, pk=pk)
+            return render(request, "billingApp/edit_payment.html", {
+                "payment": payment,
+                "tenant": payment.tenantID,
+                "bill": payment.billingID,
+                "date_today": date_today,
+            })
+
+    return render(request, "billingApp/edit_payment.html", {
+        "payment": payment,
+        "tenant": tenant_details,
+        "bill": bill,
+        "date_today": date_today
     })

@@ -10,6 +10,11 @@
     Back to Bills
   </a>
 </div>
+<div class="is-right pb-4">
+  <a href="{% url 'edit_payment' pk=payment.id %}" class="button is-small is-right is-info">
+    Edit Payment
+  </a>
+</div>
 
 <div class="card card2">
   <div class="card-content">
@@ -32,7 +37,7 @@
       </div>
       <div class="column pt-5">
         <p class="">Payment Method:</p>
-        <p class="is-size-5">{{ payment.paymentMethod }}</p>
+        <p class="is-size-5">{{ payment.get_paymentMethod_display }}</p>
       </div>
     </div>
 
