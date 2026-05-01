@@ -116,22 +116,38 @@ class BillingRecord(models.Model):
     penaltyFee = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     STATUS_UNPAID = "UNPAID"
-    STATUS_PARTIAL = "PARTIAL"
-    STATUS_PAID = "PAID"
     STATUS_UNDERPAID = "UNDERPAID"
+    STATUS_PAID = "PAID"
     STATUS_OVERPAID = "OVERPAID"
+    STATUS_OVERDUE = "OVERDUE"
 
     STATUS_CHOICES = [
         (STATUS_UNPAID, "Unpaid"),
-        (STATUS_PAID, "Paid"),
         (STATUS_UNDERPAID, "Underpaid"),
+        (STATUS_PAID, "Paid"),
         (STATUS_OVERPAID, "Overpaid"),
+        (STATUS_OVERDUE, "Overdue"),
     ]
 
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_UNPAID)
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default=STATUS_UNPAID
+    )
 
-    balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    
+    balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+
+    carryoverAdjustment = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00")
+    )
+
 
     def save(self, *args, **kwargs):
 

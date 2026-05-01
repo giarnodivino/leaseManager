@@ -17,7 +17,7 @@
         </div>
       <div class="column pt-5">
         <p class="">Amount:</p>
-        <input type="number" class="input" name="amount" value="{{ bill.amountDue }}" step="0.01" required {% if bill.billingFor == 'RENT' %}disabled{% endif %} />
+        <input type="number" class="input" name="amount" min="1" value="{{ bill.amountDue }}" step="0.01" required {% if bill.billingFor == 'RENT' %}disabled{% endif %} />
         {% if bill.billingFor == 'RENT' %}
         <input type="hidden" name="amount" value="{{ bill.amountDue }}" />
         <small class="has-text-info">Rent amounts cannot be edited</small>

@@ -9,6 +9,7 @@ from datetime import datetime
 from django.db.models import Sum
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 
 
 def get_available_units(building_id):
@@ -20,11 +21,7 @@ def calculate_total_outstanding():
     total_outstanding = Decimal("0.00")
 
     billing_records = BillingRecord.objects.filter(
-        status__in=[
-            BillingRecord.STATUS_UNPAID,
-            BillingRecord.STATUS_PARTIAL,
-            BillingRecord.STATUS_UNDERPAID,
-        ]
+        status=BillingRecord.STATUS_UNPAID
     )
 
     for record in billing_records:
@@ -46,12 +43,150 @@ def calculate_total_revenue():
 
     return f"{total_revenue:,.2f}"
 
+def money(value):
+    return (value or Decimal("0.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def get_bill_total_due(bill):
+    return money(bill.amountDue) + money(bill.penaltyFee)
+
+def recalculate_bill_balance(bill):
+    """
+    Use this when bill amount or penalty changes.
+
+    This does NOT push anything to the next bill.
+    It only recalculates the bill's current status based on payments.
+    """
+
+    total_paid = Payment.objects.filter(billingID=bill).aggregate(
+        total=Sum("amountPaid")
+    )["total"] or Decimal("0.00")
+
+    total_paid = money(total_paid)
+    total_due = get_bill_total_due(bill)
+
+    if total_paid <= Decimal("0.00"):
+        bill.status = BillingRecord.STATUS_UNPAID
+        bill.balance = total_due
+
+    elif total_paid < total_due:
+        bill.status = BillingRecord.STATUS_UNDERPAID
+        bill.balance = Decimal("0.00")
+
+    elif total_paid == total_due:
+        bill.status = BillingRecord.STATUS_PAID
+        bill.balance = Decimal("0.00")
+
+    else:
+        bill.status = BillingRecord.STATUS_OVERPAID
+        bill.balance = Decimal("0.00")
+
+    bill.save(update_fields=["status", "balance"])
+
+
+def settle_bill_and_push_difference_to_next_bill(bill):
+
+    tenant = bill.tenant
+
+    total_paid = Payment.objects.filter(billingID=bill).aggregate(
+        total=Sum("amountPaid")
+    )["total"] or Decimal("0.00")
+
+    total_paid = money(total_paid)
+    total_due = get_bill_total_due(bill)
+
+    previous_adjustment = money(bill.carryoverAdjustment)
+
+    tenant.carryover_balance = money(tenant.carryover_balance) - previous_adjustment
+
+    if total_paid <= Decimal("0.00"):
+        bill.status = BillingRecord.STATUS_UNPAID
+        bill.balance = total_due
+        bill.carryoverAdjustment = Decimal("0.00")
+
+    elif total_paid < total_due:
+        shortage = total_due - total_paid
+
+        bill.status = BillingRecord.STATUS_UNDERPAID
+        bill.balance = Decimal("0.00")
+
+        # Negative means amount to add to next bill.
+        bill.carryoverAdjustment = -shortage
+        tenant.carryover_balance = money(tenant.carryover_balance) - shortage
+
+    elif total_paid == total_due:
+        bill.status = BillingRecord.STATUS_PAID
+        bill.balance = Decimal("0.00")
+
+        bill.carryoverAdjustment = Decimal("0.00")
+
+    else:
+        excess = total_paid - total_due
+
+        bill.status = BillingRecord.STATUS_OVERPAID
+        bill.balance = Decimal("0.00")
+
+        # Positive means credit to subtract from next bill.
+        bill.carryoverAdjustment = excess
+        tenant.carryover_balance = money(tenant.carryover_balance) + excess
+
+    tenant.save(update_fields=["carryover_balance"])
+    bill.save(update_fields=["status", "balance", "carryoverAdjustment"])
+
 def calculate_total_paid():
     total_paid = Decimal("0.00")
     payments = Payment.objects.all()
     for payment in payments:
         total_paid += payment.amountPaid or Decimal("0.00")
     return f"{total_paid:,.2f}"
+
+def mark_carryover_bills_as_paid_if_settled(tenant):
+    """
+    If tenant carryover is already zero, the previous underpayment/overpayment
+    was already absorbed into the next bill.
+
+    Therefore, old UNDERPAID / OVERPAID bills should now show as PAID.
+    """
+
+    tenant.refresh_from_db()
+
+    if money(tenant.carryover_balance) != Decimal("0.00"):
+        return
+
+    BillingRecord.objects.filter(
+        tenant=tenant,
+        status__in=[
+            BillingRecord.STATUS_UNDERPAID,
+            BillingRecord.STATUS_OVERPAID,
+        ],
+    ).update(
+        status=BillingRecord.STATUS_PAID,
+        balance=Decimal("0.00"),
+    )
+
+def mark_carryover_bills_as_paid_if_settled(tenant):
+    """
+    If tenant.carryover_balance is already zero, it means the old
+    underpayment/overpayment has already been absorbed into a new bill.
+
+    So the old UNDERPAID / OVERPAID bills should now show as PAID.
+    """
+
+    tenant.refresh_from_db()
+
+    if money(tenant.carryover_balance) != Decimal("0.00"):
+        return
+
+    BillingRecord.objects.filter(
+        tenant=tenant,
+        status__in=[
+            BillingRecord.STATUS_UNDERPAID,
+            BillingRecord.STATUS_OVERPAID,
+        ],
+    ).update(
+        status=BillingRecord.STATUS_PAID,
+        balance=Decimal("0.00"),
+    )
 
 
 def get_date_today():
@@ -61,11 +196,7 @@ def get_date_today():
 def lease_has_pending_bills(lease):
     return BillingRecord.objects.filter(
         lease=lease,
-        status__in=[
-            BillingRecord.STATUS_UNPAID,
-            BillingRecord.STATUS_PARTIAL,
-            BillingRecord.STATUS_UNDERPAID,
-        ]
+        status=BillingRecord.STATUS_UNPAID
     ).exists()
 
 def get_logged_in_account(request):
@@ -91,28 +222,6 @@ def get_logged_in_account(request):
         password="AUTO_SYNC",
     )
 
-def recalculate_bill_balance(bill):
-    total_paid = Payment.objects.filter(billingID=bill).aggregate(
-        total=Sum("amountPaid")
-    )["total"] or Decimal("0.00")
-
-    amount_due = bill.amountDue or Decimal("0.00")
-    penalty_fee = bill.penaltyFee or Decimal("0.00")
-    total_bill_amount = amount_due + penalty_fee
-
-    balance = total_bill_amount - total_paid
-
-    if balance <= Decimal("0.00"):
-        bill.balance = Decimal("0.00")
-        bill.status = BillingRecord.STATUS_PAID
-    elif total_paid > Decimal("0.00"):
-        bill.balance = balance
-        bill.status = BillingRecord.STATUS_PARTIAL
-    else:
-        bill.balance = balance
-        bill.status = BillingRecord.STATUS_UNPAID
-
-    bill.save(update_fields=["balance", "status"])
 
 def register_admin(request):
     if request.method == "POST":
@@ -316,7 +425,6 @@ def send_reminder_email(request, tenant_id):
         tenant=tenant,
         status__in=[
             BillingRecord.STATUS_UNPAID,
-            BillingRecord.STATUS_PARTIAL,
             BillingRecord.STATUS_UNDERPAID
         ]
     )
@@ -363,11 +471,7 @@ def delete_tenant(request, pk):
 
     has_pending_bills = BillingRecord.objects.filter(
         tenant=tenant,
-        status__in=[
-            BillingRecord.STATUS_UNPAID,
-            BillingRecord.STATUS_PARTIAL,
-            BillingRecord.STATUS_UNDERPAID,
-        ]
+        status=BillingRecord.STATUS_UNPAID
     ).exists()
 
     if has_pending_bills:
@@ -579,11 +683,34 @@ def billing_records_main(request):
 @login_required
 def view_bills(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
-    bills = BillingRecord.objects.filter(tenant=tenant).order_by("-id")
-    payments = Payment.objects.filter(tenantID=tenant)
 
+    mark_carryover_bills_as_paid_if_settled(tenant)
+
+    bills = BillingRecord.objects.filter(
+        tenant=tenant
+    ).order_by("-id")
+
+    payments = Payment.objects.filter(
+        tenantID=tenant
+    )
 
     total_unpaid_balance = Decimal("0.00")
+
+    carryover_balance = money(tenant.carryover_balance)
+
+    carryover_type = None
+    carryover_amount = Decimal("0.00")
+    carryover_message = None
+
+    if carryover_balance > Decimal("0.00"):
+        carryover_type = "OVERPAYMENT"
+        carryover_amount = carryover_balance
+        carryover_message = f"Tenant has an overpayment credit of ₱ {carryover_amount:,.2f}. This will be deducted from the next bill."
+
+    elif carryover_balance < Decimal("0.00"):
+        carryover_type = "UNDERPAYMENT"
+        carryover_amount = abs(carryover_balance)
+        carryover_message = f"Tenant has an underpayment balance of ₱ {carryover_amount:,.2f}. This will be added to the next bill."
 
     if not (tenant.companyName or "").strip():
         tenant.companyName_display = tenant.contactPerson
@@ -592,31 +719,31 @@ def view_bills(request, pk):
 
     for b in bills:
         b.payment = Payment.objects.filter(billingID=b).order_by("-id").first()
-        # Balance is now maintained in the database, no need to recalculate
-        b.balance = b.balance or Decimal("0.00")
-        if b.status == BillingRecord.STATUS_OVERPAID:
-            # Show overpaid amount from carryover_balance
-            b.balance_display = f"{tenant.carryover_balance or Decimal('0.00'):,.2f}"
-        elif b.balance > Decimal("0.00"):
-            total_unpaid_balance += b.balance
-            b.balance_display = f"{b.balance:,.2f}"
+
+        total_bill = get_bill_total_due(b)
+        b.total_bill_display = f"{total_bill:,.2f}"
+
+        if b.status == BillingRecord.STATUS_UNPAID:
+            b.balance_display = f"{total_bill:,.2f}"
+            total_unpaid_balance += total_bill
         else:
             b.balance_display = "0.00"
 
-    carryover_due = Decimal("0.00")
-    if tenant.carryover_balance and tenant.carryover_balance < Decimal("0.00"):
-        carryover_due = abs(tenant.carryover_balance)
-        total_unpaid_balance += carryover_due
+    has_active_lease = Lease.objects.filter(
+        tenantName=tenant,
+        pastLease=False
+    ).exists()
 
-    has_active_lease = Lease.objects.filter(tenantName=tenant, pastLease=False).exists()
-    active_lease = Lease.objects.filter(tenantName=tenant, pastLease=False).first()
+    active_lease = Lease.objects.filter(
+        tenantName=tenant,
+        pastLease=False
+    ).first()
 
     date_today = get_date_today()
 
-
     return render(
         request,
-        'billingApp/view_bills.html',
+        "billingApp/view_bills.html",
         {
             "tenant": tenant,
             "bills": bills,
@@ -625,7 +752,10 @@ def view_bills(request, pk):
             "active_lease": active_lease,
             "date_today": date_today,
             "total_unpaid_balance": f"{total_unpaid_balance:,.2f}",
-            "carryover_due_display": f"{carryover_due:,.2f}",
+
+            "carryover_type": carryover_type,
+            "carryover_amount": f"{carryover_amount:,.2f}",
+            "carryover_message": carryover_message,
         },
     )
 
@@ -640,73 +770,96 @@ def add_bill(request, pk):
         .first()
     )
 
-    if lease:
-        if request.method == "POST":
-            billing_for = (request.POST.get("billingFor") or "").upper()
-            date_issued = request.POST.get("dateIssued")
-            amountdue_raw = request.POST.get("payable")
-            admin_account = get_logged_in_account(request)
-
-            if billing_for and date_issued:
-                if billing_for == "RENT":
-                    base_amount = (
-                        (lease.rentAmount or Decimal("0.00"))
-                        + (lease.parkingFees or Decimal("0.00"))
-                        + (lease.signageFees or Decimal("0.00"))
-                    )
-                else:
-                    amountdue_raw = (amountdue_raw or "0").replace(",", "")
-                    base_amount = Decimal(amountdue_raw)
-
-                carryover = tenant.carryover_balance or Decimal("0.00")
-                adjusted_amount = base_amount - carryover
-                amountdue = adjusted_amount.quantize(Decimal("0.01"))
-
-                if amountdue <= Decimal("0.00"):
-                    tenant.carryover_balance = -adjusted_amount
-                    amountdue = Decimal("0.00")
-                else:
-                    tenant.carryover_balance = Decimal("0.00")
-
-                tenant.save(update_fields=["carryover_balance"])
-
-                duplicate_bill = BillingRecord.objects.filter(
-                    tenant=tenant,
-                    lease=lease,
-                    dateIssued=date_issued,
-                    billingFor=billing_for,
-                    amountDue=amountdue,
-                ).exists()
-
-                if duplicate_bill:
-                    messages.error(
-                        request,
-                        "Duplicate bill detected. A bill with the same date, amount, and billing type already exists."
-                    )
-                    return redirect("add_bill", pk=tenant.pk)
-
-                bill = BillingRecord.objects.create(
-                    tenant=tenant,
-                    lease=lease,
-                    modified_by=admin_account,
-                    dateIssued=date_issued,
-                    billingFor=billing_for,
-                    amountDue=amountdue,
-                )
-
-                if amountdue == Decimal("0.00"):
-                    bill.status = BillingRecord.STATUS_PAID
-                    bill.balance = Decimal("0.00")
-                    bill.save(update_fields=["status", "balance"])
-            else:
-                return redirect("add_bill", pk=tenant.pk)
-            
-            return redirect("view_bills", pk=tenant.pk)
-    else:
+    if not lease:
         messages.error(request, "This tenant does not have an active lease.")
         return redirect("view_bills", pk=tenant.pk)
 
-    return render(request, "billingApp/add_bill.html", {"tenant": tenant, "lease": lease})
+    if request.method == "POST":
+        billing_for = (request.POST.get("billingFor") or "").upper()
+        date_issued = request.POST.get("dateIssued")
+        amountdue_raw = request.POST.get("payable")
+        admin_account = get_logged_in_account(request)
+
+        if not billing_for or not date_issued:
+            messages.error(request, "Please fill in all required fields.")
+            return redirect("add_bill", pk=tenant.pk)
+
+        if billing_for == BillingRecord.RENT:
+            base_amount = (
+                money(lease.rentAmount)
+                + money(lease.parkingFees)
+                + money(lease.signageFees)
+            )
+        else:
+            amountdue_raw = (amountdue_raw or "0").replace(",", "")
+            base_amount = money(Decimal(amountdue_raw))
+
+        with transaction.atomic():
+            tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+
+            carryover = money(tenant.carryover_balance)
+
+            # Positive carryover = credit, subtract from bill.
+            # Negative carryover = due, add to bill.
+            adjusted_amount = money(base_amount - carryover)
+
+            if adjusted_amount <= Decimal("0.00"):
+                amountdue = Decimal("0.00")
+
+                # Credit is bigger than this bill.
+                # Keep remaining credit for future bills.
+                tenant.carryover_balance = money(-adjusted_amount)
+
+            else:
+                amountdue = adjusted_amount
+
+                # Carryover fully consumed.
+                tenant.carryover_balance = Decimal("0.00")
+
+            tenant.save(update_fields=["carryover_balance"])
+
+            mark_carryover_bills_as_paid_if_settled(tenant)
+
+            duplicate_bill = BillingRecord.objects.filter(
+                tenant=tenant,
+                lease=lease,
+                dateIssued=date_issued,
+                billingFor=billing_for,
+                amountDue=amountdue,
+            ).exists()
+
+            if duplicate_bill:
+                messages.error(
+                    request,
+                    "Duplicate bill detected. A bill with the same date, amount, and billing type already exists."
+                )
+                return redirect("add_bill", pk=tenant.pk)
+
+            bill = BillingRecord.objects.create(
+                tenant=tenant,
+                lease=lease,
+                modified_by=admin_account,
+                dateIssued=date_issued,
+                billingFor=billing_for,
+                amountDue=amountdue,
+                balance=amountdue,
+            )
+
+            if amountdue == Decimal("0.00"):
+                bill.status = BillingRecord.STATUS_PAID
+                bill.balance = Decimal("0.00")
+                bill.save(update_fields=["status", "balance"])
+
+        return redirect("view_bills", pk=tenant.pk)
+
+    return render(
+        request,
+        "billingApp/add_bill.html",
+        {
+            "tenant": tenant,
+            "lease": lease,
+        }
+    )
 
 @login_required
 def add_units(request, pk):
@@ -831,11 +984,7 @@ def soa(request, pk):
 
     bills_qs = BillingRecord.objects.filter(
         tenant=tenant,
-        status__in=[
-            BillingRecord.STATUS_UNPAID,
-            BillingRecord.STATUS_PARTIAL,
-            BillingRecord.STATUS_UNDERPAID,
-        ],
+        status=BillingRecord.STATUS_UNPAID,
     ).order_by("dateIssued", "id")
 
     ids = request.GET.get("ids")
@@ -919,29 +1068,6 @@ def soa(request, pk):
                 "total_display": f"{total:,.2f}",
             })
 
-    if tenant.carryover_balance and tenant.carryover_balance != Decimal("0.00"):
-        from datetime import date
-
-        if tenant.carryover_balance > 0:
-            carryover_total = -tenant.carryover_balance
-            particulars = "Carryover Credit (Overpayment)"
-        else:
-            carryover_total = abs(tenant.carryover_balance)
-            particulars = "Carryover Due (Underpayment)"
-
-        lines.append({
-            "no": "",
-            "date": date.today(),
-            "particulars": particulars,
-            "amount": carryover_total,
-            "vat": Decimal("0.00"),
-            "total": carryover_total,
-            "amount_display": f"{carryover_total:,.2f}",
-            "vat_display": "0.00",
-            "total_display": f"{carryover_total:,.2f}",
-        })
-        grand_total += carryover_total
-
     company_display = (tenant.companyName or "").strip() or tenant.contactPerson
     
     current_admin = get_logged_in_account(request)
@@ -969,8 +1095,10 @@ def soa(request, pk):
     return render(request, "billingApp/soa.html", context)
 
 
+@login_required
 def add_payment(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
+
     lease = (
         Lease.objects
         .filter(tenantName=tenant, pastLease=False)
@@ -985,25 +1113,22 @@ def add_payment(request, pk):
 
     bills = BillingRecord.objects.filter(
         tenant=tenant,
-        status__in=[
-            BillingRecord.STATUS_UNPAID,
-            BillingRecord.STATUS_PARTIAL,
-            BillingRecord.STATUS_UNDERPAID,
-        ],
+        status=BillingRecord.STATUS_UNPAID,
     ).order_by("dateIssued", "id")
 
     if not (tenant.companyName or "").strip():
         tenant.companyName_display = tenant.contactPerson
-
     else:
         tenant.companyName_display = tenant.companyName
 
     if lease.rentAmount:
         lease.rentAmount = f"{lease.rentAmount:,.2f}"
+
     if lease.parkingFees:
         lease.parkingFees = f"{lease.parkingFees:,.2f}"
     else:
         lease.parkingFees = "0.00"
+
     if lease.signageFees:
         lease.signageFees = f"{lease.signageFees:,.2f}"
     else:
@@ -1011,15 +1136,8 @@ def add_payment(request, pk):
 
     for bill in bills:
         bill.display_id = f"BL-{bill.id:06d}"
-        if bill.status == BillingRecord.STATUS_UNDERPAID:
-            bill.display_label = "Underpaid by"
-            bill.display_amount = f"{abs(tenant.carryover_balance or Decimal('0.00')):,.2f}"
-        elif bill.status == BillingRecord.STATUS_OVERPAID:
-            bill.display_label = "Overpaid by"
-            bill.display_amount = f"{tenant.carryover_balance or Decimal('0.00'):,.2f}"
-        else:
-            bill.display_label = "Due"
-            bill.display_amount = bill.balance if bill.balance and bill.balance > Decimal("0.00") else bill.amountDue
+        bill.display_label = "Due"
+        bill.display_amount = get_bill_total_due(bill)
 
     if request.method == "POST":
         billing_id = request.POST.get("bill_id")
@@ -1031,90 +1149,69 @@ def add_payment(request, pk):
         proof_of_payment = request.FILES.get("proofOfPayment")
         admin_account = get_logged_in_account(request)
 
-        if Payment.objects.filter(referenceNumber=reference_number).exists():
-            messages.error(request, "This reference number has already been used for another payment.")
-            return redirect("add_payment", pk=tenant.pk)
-
         if not (billing_id and amount_paid_raw and date_paid and payment_method and reference_number):
             messages.error(request, "Please fill in all required fields.")
             return redirect("add_payment", pk=tenant.pk)
 
+        if Payment.objects.filter(referenceNumber=reference_number).exists():
+            messages.error(request, "This reference number has already been used for another payment.")
+            return redirect("add_payment", pk=tenant.pk)
+
         try:
-            amount_paid = Decimal(str(amount_paid_raw))
-        except (TypeError, ValueError, ArithmeticError):
+            amount_paid = money(Decimal(str(amount_paid_raw).replace(",", "")))
+        except Exception:
             messages.error(request, "Amount paid is invalid.")
             return redirect("add_payment", pk=tenant.pk)
 
-        if amount_paid < Decimal("0"):
-            messages.error(request, "Amount paid cannot be negative.")
+        if amount_paid <= Decimal("0.00"):
+            messages.error(request, "Amount paid must be greater than zero.")
             return redirect("add_payment", pk=tenant.pk)
 
         try:
             billing_id = int(billing_id)
-        except (TypeError, ValueError):
+        except Exception:
             messages.error(request, "Selected bill is invalid.")
             return redirect("add_payment", pk=tenant.pk)
 
         bill_to_pay = bills.filter(pk=billing_id).first()
+
         if not bill_to_pay:
             messages.error(request, "Selected bill is invalid.")
             return redirect("add_payment", pk=tenant.pk)
 
         try:
-            Payment.objects.create(
-                tenantID=tenant,
-                modified_by=admin_account,
-                amountPaid=amount_paid,
-                subAccountName=sub_account_name or None,
-                datePaid=date_paid,
-                billingID=bill_to_pay,
-                referenceNumber=reference_number,
-                paymentMethod=payment_method,
-                proofOfPayment=proof_of_payment,
-            )
+            with transaction.atomic():
+                Payment.objects.create(
+                    tenantID=tenant,
+                    modified_by=admin_account,
+                    amountPaid=amount_paid,
+                    subAccountName=sub_account_name or None,
+                    datePaid=date_paid,
+                    billingID=bill_to_pay,
+                    referenceNumber=reference_number,
+                    paymentMethod=payment_method,
+                    proofOfPayment=proof_of_payment,
+                )
 
-            # Update the bill's balance after payment and carry over any overpayment/underpayment.
-            if bill_to_pay.status == BillingRecord.STATUS_UNDERPAID:
-                # For underpaid bills, payment is applied to the carryover balance
-                underpaid_amount = abs(tenant.carryover_balance or Decimal("0.00"))
-                tenant.carryover_balance = (tenant.carryover_balance or Decimal("0.00")) + amount_paid
-                bill_to_pay.balance = Decimal("0.00")
-                if tenant.carryover_balance > Decimal("0.00"):
-                    # Overpayment: credit for next bill
-                    bill_to_pay.status = BillingRecord.STATUS_OVERPAID
-                elif tenant.carryover_balance == Decimal("0.00"):
-                    # Exact payment: no carryover
-                    bill_to_pay.status = BillingRecord.STATUS_PAID
-                # else carryover_balance < 0: still UNDERPAID
-                tenant.save(update_fields=["carryover_balance"])
-            else:
-                old_balance = bill_to_pay.balance if bill_to_pay.balance is not None else bill_to_pay.amountDue
-                remaining_balance = old_balance - amount_paid
+                settle_bill_and_push_difference_to_next_bill(bill_to_pay)
 
-                if remaining_balance < Decimal("0.00"):
-                    # Overpayment becomes tenant credit for next bill.
-                    tenant.carryover_balance = (tenant.carryover_balance or Decimal("0.00")) + (-remaining_balance)
-                    bill_to_pay.status = BillingRecord.STATUS_OVERPAID
-                    bill_to_pay.balance = Decimal("0.00")
-                    tenant.save(update_fields=["carryover_balance"])
-                elif remaining_balance == Decimal("0.00"):
-                    bill_to_pay.status = BillingRecord.STATUS_PAID
-                    bill_to_pay.balance = Decimal("0.00")
-                else:
-                    # Underpayment is carried to the next bill.
-                    bill_to_pay.status = BillingRecord.STATUS_UNDERPAID
-                    bill_to_pay.balance = Decimal("0.00")
-                    tenant.carryover_balance = (tenant.carryover_balance or Decimal("0.00")) - remaining_balance
-                    tenant.save(update_fields=["carryover_balance"])
-
-            bill_to_pay.save()
-
+            messages.success(request, "Payment added successfully.")
             return redirect("view_payments", pk=tenant.pk)
-        except Exception:
-            messages.error(request, "Unable to save payment. Please verify the form values.")
+
+        except Exception as e:
+            messages.error(request, f"Unable to save payment: {str(e)}")
             return redirect("add_payment", pk=tenant.pk)
-    
-    return render(request, "billingApp/add_payment.html", {"tenant": tenant, "lease": lease, "bills": bills})
+
+    return render(
+        request,
+        "billingApp/add_payment.html",
+        {
+            "tenant": tenant,
+            "lease": lease,
+            "bills": bills,
+        }
+    )
+
 
 @login_required
 def delete_payment(request, pk):
@@ -1123,25 +1220,11 @@ def delete_payment(request, pk):
     tenant = payment.tenantID
     bill = payment.billingID
 
-    payment.delete()
+    with transaction.atomic():
+        payment.delete()
+        settle_bill_and_push_difference_to_next_bill(bill)
 
-    total_paid = Payment.objects.filter(billingID=bill).aggregate(
-        total=Sum("amountPaid")
-    )["total"] or Decimal("0.00")
-
-    bill.balance = bill.amountDue - total_paid
-
-    if total_paid == Decimal("0.00"):
-        bill.status = BillingRecord.STATUS_UNPAID
-        bill.balance = bill.amountDue
-    elif bill.balance > Decimal("0.00"):
-        bill.status = BillingRecord.STATUS_PARTIAL
-    else:
-        bill.status = BillingRecord.STATUS_PAID
-        bill.balance = Decimal("0.00")
-
-    bill.save(update_fields=["status", "balance"])
-
+    messages.success(request, "Payment deleted successfully.")
     return redirect("view_bills", pk=tenant.pk)
 
 def delete_bill(request, pk):
@@ -1157,8 +1240,8 @@ def edit_bill(request, pk):
     tenant = bill.tenant
     date_today = get_date_today()
 
-    if bill.status == BillingRecord.STATUS_PAID:
-        messages.error(request, "Cannot edit a fully paid bill.")
+    if bill.status != BillingRecord.STATUS_UNPAID:
+        messages.error(request, "Cannot edit a bill that already has a payment record.")
         return redirect("view_bills", pk=tenant.pk)
 
     if request.method == "POST":
@@ -1653,8 +1736,10 @@ def edit_payment(request, pk):
             
             admin_account = get_logged_in_account(request)
             payment.modified_by = admin_account
-            payment.save()
-            
+            with transaction.atomic():
+                payment.save()
+                settle_bill_and_push_difference_to_next_bill(payment.billingID)
+
             messages.success(request, "Payment updated successfully.")
             return redirect("payment_details", pk=payment.pk)
             
