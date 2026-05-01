@@ -60,12 +60,23 @@ class Lease(models.Model):
     contractEnd = models.DateField(null=True, blank=True)
 
     pastLease = models.BooleanField(default=False)
+    archived_date = models.DateField(null=True, blank=True)
 
     leaseAttachment = models.FileField(
         upload_to="lease_attachments/",
         blank=True,
         null=True
     )
+
+    def save(self, *args, **kwargs):
+        # Check if this is a new lease or if pastLease is changing
+        if self.pk:  # If the lease already exists
+            old_lease = Lease.objects.get(pk=self.pk)
+            # If pastLease changes from False to True and archived_date isn't set yet
+            if not old_lease.pastLease and self.pastLease and not self.archived_date:
+                self.archived_date = timezone.now().date()
+        
+        super().save(*args, **kwargs)
 
     class Meta:
         constraints = [
