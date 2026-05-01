@@ -7,6 +7,8 @@ from django.contrib.auth.decorators import login_required
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from django.db.models import Sum
+from django.core.mail import send_mail
+from django.conf import settings
 
 
 def get_available_units(building_id):
@@ -268,6 +270,56 @@ def tenant_details(request, pk):
         
     date_today = get_date_today()
     return render(request, 'billingApp/tenant_details.html', {'t':tenant, 'lease':leases, 'date_today': date_today})
+
+@login_required
+def send_reminder_email(request, tenant_id):
+    tenant = get_object_or_404(Tenant, pk=tenant_id)
+    
+    # Get pending bills for this tenant
+    pending_bills = BillingRecord.objects.filter(
+        tenant=tenant,
+        status__in=[
+            BillingRecord.STATUS_UNPAID,
+            BillingRecord.STATUS_PARTIAL,
+            BillingRecord.STATUS_UNDERPAID
+        ]
+    )
+    
+    if not pending_bills.exists():
+        messages.info(request, "No pending bills to remind about.")
+        return redirect('tenant_details', pk=tenant_id)
+    
+    # Calculate total amount due
+    total_due = sum(bill.balance or Decimal('0.00') for bill in pending_bills)
+    
+    # Compose email
+    subject = f"Billing Reminder - Outstanding Payment Due"
+    message = f"""Dear {tenant.contactPerson},
+
+This is a friendly reminder that you have outstanding payment(s) due.
+
+Total Amount Due: ₱{total_due:,.2f}
+Contact Person: {tenant.contactPerson}
+Phone: {tenant.phoneNumber}
+
+Please settle your account at your earliest convenience.
+
+Best regards,
+J&F Divino Development Corporation"""
+    
+    try:
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [tenant.email],
+            fail_silently=False,
+        )
+        messages.success(request, f"Reminder email sent to {tenant.email}")
+    except Exception as e:
+        messages.error(request, f"Failed to send email: {str(e)}")
+    
+    return redirect('tenant_details', pk=tenant_id)
 
 @login_required
 def delete_tenant(request, pk):

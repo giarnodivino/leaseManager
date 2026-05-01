@@ -51,6 +51,7 @@
         <div class="columns p-4 mt-5 is-justify-content-center">
           <div class="buttons is-centered">
             <a href="{% url 'edit_tenant' pk=t.pk %}" class="button">EDIT TENANT</a>
+            <a href="{% url 'send_reminder_email' t.pk %}" class="button is-info">SEND REMINDER EMAIL</a>
             <a href="{% url 'delete_tenant' pk=t.pk %}" class="button is-danger">DELETE TENANT</a>
           </div>
         </div>

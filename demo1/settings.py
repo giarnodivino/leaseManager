@@ -127,3 +127,12 @@ STATICFILES_DIRS = [BASE_DIR / 'demo1/static']
 # Media files (User uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'giarnodivino@gmail.com'  # Replace with your email
+EMAIL_HOST_PASSWORD = 'ekxw jqma ains ljlj'  # Replace with app-specific password
+DEFAULT_FROM_EMAIL = 'giarnodivino@gmail.com'  # Replace with your email
