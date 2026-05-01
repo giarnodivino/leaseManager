@@ -123,7 +123,6 @@ class BillingRecord(models.Model):
 
     STATUS_CHOICES = [
         (STATUS_UNPAID, "Unpaid"),
-        (STATUS_PARTIAL, "Partial"),
         (STATUS_PAID, "Paid"),
         (STATUS_UNDERPAID, "Underpaid"),
         (STATUS_OVERPAID, "Overpaid"),
