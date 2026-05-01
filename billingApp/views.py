@@ -18,19 +18,32 @@ def get_available_units(building_id):
 
 def calculate_total_outstanding():
     total_outstanding = Decimal("0.00")
+
     billing_records = BillingRecord.objects.filter(
-        status__in=[BillingRecord.STATUS_UNPAID, BillingRecord.STATUS_PARTIAL]
+        status__in=[
+            BillingRecord.STATUS_UNPAID,
+            BillingRecord.STATUS_PARTIAL,
+            BillingRecord.STATUS_UNDERPAID,
+        ]
     )
+
     for record in billing_records:
         total_outstanding += record.balance or Decimal("0.00")
+
     return f"{total_outstanding:,.2f}"
 
 # total revenue should include all paid and unpaid bills
 def calculate_total_revenue():
     total_revenue = Decimal("0.00")
-    billing_records = BillingRecord.objects.all()
-    for record in billing_records:
-        total_revenue += record.amountDue or Decimal("0.00")
+
+    lease_records = Lease.objects.all()
+
+    for record in lease_records:
+        total_revenue += (record.rentAmount or Decimal("0.00"))
+        total_revenue += (record.parkingFees or Decimal("0.00"))
+        total_revenue += (record.signageFees or Decimal("0.00"))
+
+
     return f"{total_revenue:,.2f}"
 
 def calculate_total_paid():
@@ -77,6 +90,29 @@ def get_logged_in_account(request):
         username=username,
         password="AUTO_SYNC",
     )
+
+def recalculate_bill_balance(bill):
+    total_paid = Payment.objects.filter(billingID=bill).aggregate(
+        total=Sum("amountPaid")
+    )["total"] or Decimal("0.00")
+
+    amount_due = bill.amountDue or Decimal("0.00")
+    penalty_fee = bill.penaltyFee or Decimal("0.00")
+    total_bill_amount = amount_due + penalty_fee
+
+    balance = total_bill_amount - total_paid
+
+    if balance <= Decimal("0.00"):
+        bill.balance = Decimal("0.00")
+        bill.status = BillingRecord.STATUS_PAID
+    elif total_paid > Decimal("0.00"):
+        bill.balance = balance
+        bill.status = BillingRecord.STATUS_PARTIAL
+    else:
+        bill.balance = balance
+        bill.status = BillingRecord.STATUS_UNPAID
+
+    bill.save(update_fields=["balance", "status"])
 
 def register_admin(request):
     if request.method == "POST":
@@ -1639,3 +1675,38 @@ def edit_payment(request, pk):
         "bill": bill,
         "date_today": date_today
     })
+
+@login_required
+def add_penalty(request, pk):
+    bill = get_object_or_404(BillingRecord, pk=pk)
+    tenant = bill.tenant
+    date_today = get_date_today()
+
+    if request.method == "POST":
+        penalty_raw = request.POST.get("penaltyAmount")
+
+        try:
+            penalty_amount = Decimal(str(penalty_raw)).quantize(Decimal("0.01"))
+        except:
+            messages.error(request, "Invalid penalty amount.")
+            return redirect("add_penalty", pk=bill.pk)
+
+        if penalty_amount <= Decimal("0.00"):
+            messages.error(request, "Penalty must be greater than zero.")
+            return redirect("add_penalty", pk=bill.pk)
+
+        bill.penaltyFee = (bill.penaltyFee or Decimal("0.00")) + penalty_amount
+        bill.modified_by = get_logged_in_account(request)
+        bill.save(update_fields=["penaltyFee", "modified_by", "modified_at"])
+
+        recalculate_bill_balance(bill)
+
+        messages.success(request, "Penalty added successfully.")
+        return redirect("view_bills", pk=tenant.pk)
+
+    return render(request, "billingApp/add_penalty.html", {
+        "bill": bill,
+        "tenant": tenant,
+        "date_today": date_today,
+    })
+

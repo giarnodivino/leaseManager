@@ -36,4 +36,5 @@ urlpatterns = [
     path('edit_payment/<int:pk>/', views.edit_payment, name='edit_payment'),
     path('delete_payment/<int:pk>/', views.delete_payment, name='delete_payment'),
     path('send-reminder/<int:tenant_id>/', views.send_reminder_email, name='send_reminder_email'),
+    path("bill/<int:pk>/add-penalty/", views.add_penalty, name="add_penalty"),
 ]
