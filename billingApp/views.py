@@ -11,7 +11,6 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
 
-
 def get_available_units(building_id):
     leased_units = Lease.objects.filter(buildingName_id=building_id, pastLease=False).values_list("unitID_id", flat=True)
     available_units = Units.objects.filter(building_id=building_id).exclude(pk__in=leased_units)
@@ -271,7 +270,67 @@ def home_page(request):
     total_outstanding_balance = calculate_total_outstanding()
     total_revenue = calculate_total_revenue()
     total_paid = calculate_total_paid()
-    return render(request, 'billingApp/home_page.html', {'total_outstanding': total_outstanding_balance, 'total_revenue': total_revenue, 'total_paid': total_paid})
+
+    unpaid_bills = BillingRecord.objects.filter(
+        status=BillingRecord.STATUS_UNPAID
+    ).select_related("tenant").order_by("tenant__companyName")[:10]
+
+    unpaid_clients = []
+
+    for bill in unpaid_bills:
+        tenant = bill.tenant
+        tenant_name = (tenant.companyName or "").strip() or tenant.contactPerson
+
+        unpaid_clients.append({
+            "tenant": tenant,
+            "name": tenant_name,
+            "amount": f"{bill.balance or bill.amountDue:,.2f}",
+        })
+
+    unpaid_client_count = BillingRecord.objects.filter(
+        status=BillingRecord.STATUS_UNPAID
+    ).values("tenant").distinct().count()
+
+    buildings = Building.objects.all().order_by("buildingName")
+
+    building_cards = []
+
+    for building in buildings:
+        active_tenant_count = Lease.objects.filter(
+            buildingName=building,
+            pastLease=False
+        ).count()
+
+        total_units = Units.objects.filter(
+            building=building
+        ).count()
+
+        occupied_units = Lease.objects.filter(
+            buildingName=building,
+            pastLease=False
+        ).values("unitID").distinct().count()
+
+        available_slots = total_units - occupied_units
+
+        building_cards.append({
+            "building": building,
+            "active_tenant_count": active_tenant_count,
+            "available_slots": available_slots,
+            "available_parking_slots": building.parkingCapacity or 0,
+        })
+
+    return render(
+        request,
+        "billingApp/home_page.html",
+        {
+            "total_outstanding": total_outstanding_balance,
+            "total_revenue": total_revenue,
+            "total_paid": total_paid,
+            "unpaid_clients": unpaid_clients,
+            "unpaid_client_count": unpaid_client_count,
+            "building_cards": building_cards,
+        }
+    )
 
 @login_required
 def buildings_main(request):
