@@ -1,0 +1,9 @@
+{% if messages %}
+<div class="message-list">
+  {% for message in messages %}
+  <div class="notification is-light mb-3 {% if 'error' in message.tags %}is-danger{% elif 'success' in message.tags %}is-success{% elif 'warning' in message.tags %}is-warning{% elif 'info' in message.tags %}is-info{% else %}is-primary{% endif %}">
+    {{ message }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

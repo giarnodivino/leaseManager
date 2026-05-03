@@ -27,13 +27,9 @@
         {% for l in leases %}
         <p class="is-size-5 has-text-weight-normal">
           Lease {{ forloop.counter }}:
-          <strong>{{ l.buildingName }} - {{ l.unitID }}</strong>
+          <strong>{{ l.unitID }}</strong>
         </p>
         {% endfor %}
-        <p class="is-size-5 has-text-weight-normal">
-          Primary Lease:
-          <strong>{{ lease.buildingName }} - {{ lease.unitID }}</strong>
-        </p>
       </div>
       <form method="POST" action="{% url 'add_bill' pk=tenant.pk %}">
         {% csrf_token %}
@@ -67,9 +63,7 @@
 {% if messages %}
 <div class="columns is-justify-content-center p-4">
   <div class="column is-6">
-    {% for message in messages %}
-    <div class="notification is-{{ message.tags }}">{{ message }}</div>
-    {% endfor %}
+    {% include 'billingApp/includes/messages.html' %}
   </div>
 </div>
 {% endif %}

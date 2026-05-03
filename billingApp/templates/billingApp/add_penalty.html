@@ -5,15 +5,7 @@
     <p class="is-size-6 has-text-centered">Tenant: {{ tenant.companyName|default:tenant.contactPerson }}</p>
     <h1 class="is-size-4 has-text-weight-bold has-text-centered pb-5">Add Penalty to Billing ID: {{ bill.billing_number }}</h1>
     
-    <div class="message is-danger">
-      {% if messages %}
-      <ul class="messages message-header">
-        {% for message in messages %}
-        <li {% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-    </div>
+    {% include 'billingApp/includes/messages.html' %}
 
     <form method="POST" action="{% url 'add_penalty' pk=bill.pk %}">
       {% csrf_token %}

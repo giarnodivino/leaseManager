@@ -14,12 +14,8 @@
     </p>
 
     {% if messages %}
-    <div class="message is-danger mb-4">
-      <div class="message-body">
-        {% for message in messages %}
-        <p {% if message.tags %} class="{{ message.tags }}" {% endif %}>{{ message }}</p>
-        {% endfor %}
-      </div>
+    <div class="mb-4">
+      {% include 'billingApp/includes/messages.html' %}
     </div>
     {% endif %}
 

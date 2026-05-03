@@ -29,11 +29,7 @@
 {% if messages %}
     <div class="columns is-justify-content-center p-4">
         <div class="column is-6">
-            {% for message in messages %}
-                <div class="notification is-{{ message.tags }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
+            {% include 'billingApp/includes/messages.html' %}
         </div>
     </div>
 {% endif %}

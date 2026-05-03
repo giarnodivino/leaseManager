@@ -67,11 +67,9 @@
 </div>
 
 {% if messages %}
-  {% for message in messages %}
-    <div class="notification is-{{ message.tags }} mt-4">
-      {{ message }}
-    </div>
-  {% endfor %}
+  <div class="mt-4">
+    {% include 'billingApp/includes/messages.html' %}
+  </div>
 {% endif %}
 
 {% endblock %}
