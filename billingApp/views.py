@@ -271,20 +271,31 @@ def home_page(request):
     total_revenue = calculate_total_revenue()
     total_paid = calculate_total_paid()
 
-    unpaid_bills = BillingRecord.objects.filter(
-        status=BillingRecord.STATUS_UNPAID
-    ).select_related("tenant").order_by("tenant__companyName")[:10]
+    unpaid_clients_query = (
+    BillingRecord.objects
+    .filter(status=BillingRecord.STATUS_UNPAID)
+    .values(
+        "tenant",
+        "tenant__companyName",
+        "tenant__contactPerson",
+    )
+    .annotate(total_unpaid=Sum("balance"))
+    .order_by("tenant__companyName", "tenant__contactPerson")[:10]
+)
 
     unpaid_clients = []
 
-    for bill in unpaid_bills:
-        tenant = bill.tenant
-        tenant_name = (tenant.companyName or "").strip() or tenant.contactPerson
+    for item in unpaid_clients_query:
+        tenant = Tenant.objects.get(pk=item["tenant"])
+
+        tenant_name = (
+            item["tenant__companyName"] or ""
+        ).strip() or item["tenant__contactPerson"]
 
         unpaid_clients.append({
             "tenant": tenant,
             "name": tenant_name,
-            "amount": f"{bill.balance or bill.amountDue:,.2f}",
+            "amount": f"{item['total_unpaid'] or Decimal('0.00'):,.2f}",
         })
 
     unpaid_client_count = BillingRecord.objects.filter(
@@ -1390,16 +1401,27 @@ def view_proof_of_payment(request, pk):
 @login_required
 def renew_lease(request, pk):
     """
-    Renew/edit a tenant's lease. 
-    Archives the current lease (marks as pastLease=True) and creates a new lease with updated terms.
+    Renew/edit a tenant's active lease.
+    Archives the current lease and creates a new lease with updated terms.
     """
-    lease = get_object_or_404(Lease, pk=pk)
-    tenant = lease.tenantName
 
-    if not lease.pastLease and lease_has_pending_bills(lease):
+    tenant = get_object_or_404(Tenant, pk=pk)
+
+    lease = (
+        Lease.objects
+        .filter(tenantName=tenant, pastLease=False)
+        .order_by("-contractStart")
+        .first()
+    )
+
+    if not lease:
+        messages.error(request, "Cannot renew lease because this tenant does not have an active lease.")
+        return redirect("tenant_details", pk=tenant.pk)
+
+    if lease_has_pending_bills(lease):
         messages.error(
             request,
-            "Cannot renew/archive this lease because it still has unpaid or partially paid bills."
+            "Cannot renew/archive this lease because it still has unpaid bills."
         )
         return redirect("tenant_details", pk=tenant.pk)
 
@@ -1854,3 +1876,14 @@ def add_penalty(request, pk):
         "date_today": date_today,
     })
 
+def delete_unit(request, pk):
+    unit = get_object_or_404(Units, pk=pk)
+    building = unit.building_id
+
+    if Lease.objects.filter(unitID=unit, pastLease=False).exists():
+        messages.error(request, "Cannot delete a unit that has an active lease.")
+        return redirect("view_units")
+
+    unit.delete()
+    messages.success(request, "Unit deleted successfully.")
+    return redirect("view_units", pk=building)

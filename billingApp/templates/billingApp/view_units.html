@@ -16,9 +16,11 @@
                     <tr>
                         <th style="width:50%" class="has-text-centered">Unit Number</th>
                         <th style="width:50%" class="has-text-centered">Status</th>
+                        <th style="width:50%" class="has-text-centered">Actions</th>
                     </tr>
                 </thead>
 
+                <!-- add another column to the table to check if the unit has an active lease. if not, show a delete button-->
                 <tbody>
                     {% for unit in units %}
                     <tr>
@@ -29,6 +31,11 @@
                                 Occupied
                             {% else %}
                                 Available
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not unit.lease_set.exists %}
+                                <a href="{% url 'delete_unit' pk=unit.pk %}" class="button is-danger">Delete</a>
                             {% endif %}
                         </td>
                     </tr>

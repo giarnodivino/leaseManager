@@ -53,6 +53,8 @@
     border-radius: 14px;
     padding: 2.5rem;
     box-shadow: 0 14px 35px rgba(0, 0, 0, 0.05);
+    max-height: 700px !important;
+    min-height: 500px !important;
   }
 
   .white-card {
@@ -260,8 +262,7 @@
                   <h2 class="section-title">Unpaid Clients</h2>
 
                   <div class="search-row">
-                    <button class="filter-button">☰ Filter</button>
-                    <input class="dashboard-search" type="text" placeholder="Search" />
+                    <input id="searchInput" class="dashboard-search" type="text" placeholder="Search" />
                   </div>
 
                   <div class="unpaid-list">
@@ -322,5 +323,21 @@
     </div>
   </div>
 </div>
+
+<script>
+  document.getElementById("searchInput").addEventListener("input", function () {
+    const searchTerm = this.value.toLowerCase();
+    const unpaidRows = document.querySelectorAll(".unpaid-row");
+
+    unpaidRows.forEach((row) => {
+      const tenantName = row.querySelector(".tenant-name").textContent.toLowerCase();
+      if (tenantName.includes(searchTerm)) {
+        row.style.display = "";
+      } else {
+        row.style.display = "none";
+      }
+    });
+  });
+</script>
 
 {% endblock %}
