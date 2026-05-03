@@ -329,6 +329,7 @@ def home_page(request):
             "active_tenant_count": active_tenant_count,
             "available_slots": available_slots,
             "available_parking_slots": building.parkingCapacity or 0,
+            "available_signage_slots": building.signageCapacity or 0,
         })
 
     return render(
