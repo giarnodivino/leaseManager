@@ -963,19 +963,78 @@ def add_units(request, pk):
     building_details = get_object_or_404(Building, pk=pk)
     if request.method == "POST":
         building_id = building_details.pk
-        unit_number = request.POST.get("unit_number")
-        
-        if building_id and unit_number:
-            existing_unit = Units.objects.filter(building_id=building_id, unitID=unit_number).first()
-            if existing_unit:
-                messages.error(request, "This unit already exists.")
+        add_mode = request.POST.get("add_mode", "single")
+
+        if add_mode == "bulk":
+            try:
+                floor = int(request.POST.get("floor", ""))
+                start_room = int(request.POST.get("start_room", ""))
+                end_room = int(request.POST.get("end_room", ""))
+            except ValueError:
+                messages.error(request, "Please provide a valid floor and room range.")
                 return redirect("add_unit", pk=building_id)
-            Units.objects.create(building_id=building_id, unitID=unit_number)
-            messages.add_message(request, messages.SUCCESS, "Unit added successfully.")
+
+            if not (1 <= floor <= 9 and 1 <= start_room <= end_room <= 99):
+                messages.error(request, "Floor must be 1-9 and room numbers must be 1-99.")
+                return redirect("add_unit", pk=building_id)
+
+            unit_numbers = [
+                floor * 100 + room
+                for room in range(start_room, end_room + 1)
+            ]
+
+            if len(unit_numbers) > 500:
+                messages.error(request, "Please add 500 units or fewer at a time.")
+                return redirect("add_unit", pk=building_id)
+
+            existing_unit_numbers = set(
+                Units.objects.filter(building_id=building_id, unitID__in=unit_numbers)
+                .values_list("unitID", flat=True)
+            )
+            units_to_create = [
+                Units(building_id=building_id, unitID=unit_number)
+                for unit_number in unit_numbers
+                if unit_number not in existing_unit_numbers
+            ]
+
+            if units_to_create:
+                Units.objects.bulk_create(units_to_create)
+
+            skipped_count = len(existing_unit_numbers)
+            created_count = len(units_to_create)
+
+            if created_count and skipped_count:
+                messages.success(
+                    request,
+                    f"{created_count} units added successfully. {skipped_count} existing units were skipped.",
+                )
+            elif created_count:
+                messages.success(request, f"{created_count} units added successfully.")
+            else:
+                messages.warning(request, "No units were added because all generated units already exist.")
+
             return redirect("add_unit", pk=building_id)
-        else:
-            messages.error(request, "Please provide both building and unit number.")
+
+        unit_number = request.POST.get("unit_number")
+
+        try:
+            unit_number = int(unit_number)
+        except (TypeError, ValueError):
+            messages.error(request, "Please provide a valid unit number.")
             return redirect("add_unit", pk=building_id)
+
+        if not 100 <= unit_number <= 999:
+            messages.error(request, "Unit number must be a 3-digit number.")
+            return redirect("add_unit", pk=building_id)
+
+        existing_unit = Units.objects.filter(building_id=building_id, unitID=unit_number).first()
+        if existing_unit:
+            messages.error(request, "This unit already exists.")
+            return redirect("add_unit", pk=building_id)
+
+        Units.objects.create(building_id=building_id, unitID=unit_number)
+        messages.success(request, "Unit added successfully.")
+        return redirect("add_unit", pk=building_id)
 
     buildings = Building.objects.all()
 

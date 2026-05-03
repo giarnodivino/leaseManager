@@ -4,8 +4,46 @@
 <div class="card card2">
     <div class="card-content has-text-centered">
         <h1 class="is-size-3 p-5 mt-6">Add Units for <strong>{{ building.buildingName }}</strong></h1>
+
+        {% if messages %}
+            <div class="columns is-justify-content-center p-4">
+                <div class="column is-6">
+                    {% include 'billingApp/includes/messages.html' %}
+                </div>
+            </div>
+        {% endif %}
+
         <form method="POST" action="{% url 'add_unit' pk=building.pk %}">
             {% csrf_token %}
+            <input type="hidden" name="add_mode" value="bulk" />
+            <h2 class="is-size-5 has-text-weight-semibold">Add by Floor and Room Range</h2>
+            <div class="columns is-justify-content-center p-4">
+                <div class="column is-2">
+                    <label for="floor">Floor:</label>
+                    <input type="number" class="input" id="floor" name="floor" min="1" max="9" placeholder="1" required />
+                </div>
+                <div class="column is-2">
+                    <label for="start_room">Start Room:</label>
+                    <input type="number" class="input" id="start_room" name="start_room" min="1" max="99" placeholder="1" required />
+                </div>
+                <div class="column is-2">
+                    <label for="end_room">End Room:</label>
+                    <input type="number" class="input" id="end_room" name="end_room" min="1" max="99" placeholder="20" required />
+                </div>
+            </div>
+            <div class="columns is-justify-content-center p-4">
+                <div class="column is-3">
+                    <button type="submit" class="button is-primary">Add Units</button>
+                </div>
+            </div>
+        </form>
+
+        <hr />
+
+        <form method="POST" action="{% url 'add_unit' pk=building.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="add_mode" value="single" />
+            <h2 class="is-size-5 has-text-weight-semibold">Add One Unit</h2>
             <div class="columns is-justify-content-center p-4">
                 <div class="column is-3">
                     <label for="unit_number">Unit Number:</label>
@@ -14,7 +52,7 @@
             </div>
             <div class="columns is-justify-content-center p-4">
                 <div class="column is-3">
-                    <button type="submit" class="button is-primary">Add Unit</button>
+                    <button type="submit" class="button is-primary is-light">Add Unit</button>
                 </div>
             </div>
         </form>
@@ -26,12 +64,5 @@
         </div>
     </div>
 </div>
-{% if messages %}
-    <div class="columns is-justify-content-center p-4">
-        <div class="column is-6">
-            {% include 'billingApp/includes/messages.html' %}
-        </div>
-    </div>
-{% endif %}
 
 {% endblock %}
