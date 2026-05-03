@@ -3,7 +3,6 @@ from datetime import timedelta, date
 from django.conf import settings
 from django.utils import timezone
 from decimal import Decimal
-from django.db.models import Q
 
 # Create your models here.
 class Building(models.Model):
@@ -77,15 +76,6 @@ class Lease(models.Model):
                 self.archived_date = timezone.now().date()
         
         super().save(*args, **kwargs)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["tenantName"],
-                condition=Q(pastLease=False),
-                name="unique_active_lease_per_tenant",
-            ),
-        ]
 
     def __str__(self):
         return f"Lease of {self.tenantName} at {self.buildingName}"

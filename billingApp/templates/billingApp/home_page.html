@@ -325,19 +325,22 @@
 </div>
 
 <script>
-  document.getElementById("searchInput").addEventListener("input", function () {
-    const searchTerm = this.value.toLowerCase();
+  document.addEventListener("DOMContentLoaded", function () {
+    const searchInput = document.getElementById("searchInput");
     const unpaidRows = document.querySelectorAll(".unpaid-row");
 
-    unpaidRows.forEach((row) => {
-      const tenantName = row.querySelector(".tenant-name").textContent.toLowerCase();
-      if (tenantName.includes(searchTerm)) {
-        row.style.display = "";
-      } else {
-        row.style.display = "none";
-      }
+    searchInput.addEventListener("input", function () {
+      const searchTerm = searchInput.value.toLowerCase();
+
+      unpaidRows.forEach(function (row) {
+        const tenantName = row.querySelector(".tenant-name").textContent.toLowerCase();
+        if (tenantName.includes(searchTerm)) {
+          row.style.display = "";
+        } else {
+          row.style.display = "none";
+        }
+      });
     });
   });
 </script>
-
 {% endblock %}

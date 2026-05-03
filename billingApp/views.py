@@ -4,9 +4,10 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
-from django.db.models import Sum
+from django.db.models import Exists, OuterRef, Sum
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
@@ -310,7 +311,7 @@ def home_page(request):
         active_tenant_count = Lease.objects.filter(
             buildingName=building,
             pastLease=False
-        ).count()
+        ).values("tenantName").distinct().count()
 
         total_units = Units.objects.filter(
             building=building
@@ -440,6 +441,11 @@ def building_details(request, pk):
 @login_required
 def delete_building(request, pk):
     b = get_object_or_404(Building, pk=pk)
+    
+    if Lease.objects.filter(buildingName=b, pastLease=False).exists():
+        messages.error(request, "Cannot delete this building because it has active leases.")
+        return redirect("building_details", pk=b.pk)
+
     Building.objects.filter(pk=pk).delete()
     return redirect('buildings_main')
 
@@ -476,7 +482,12 @@ def add_tenant(request):
 @login_required
 def tenant_details(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
-    leases = Lease.objects.filter(tenantName=tenant, pastLease=False)
+    leases = (
+        Lease.objects
+        .filter(tenantName=tenant, pastLease=False)
+        .select_related("buildingName", "unitID")
+        .order_by("contractStart", "id")
+    )
 
     if not (tenant.companyName or "").strip():
         tenant.companyName_display = tenant.contactPerson
@@ -484,7 +495,7 @@ def tenant_details(request, pk):
         tenant.companyName_display = tenant.companyName
         
     date_today = get_date_today()
-    return render(request, 'billingApp/tenant_details.html', {'t':tenant, 'lease':leases, 'date_today': date_today})
+    return render(request, 'billingApp/tenant_details.html', {'t': tenant, 'leases': leases, 'date_today': date_today})
 
 @login_required
 def send_reminder_email(request, tenant_id):
@@ -576,10 +587,6 @@ def add_lease(request, pk):
         for unit in units
     ]
 
-    if Lease.objects.filter(tenantName=tenant, pastLease=False).exists():
-        messages.error(request, "This tenant already has an active lease.")
-        return redirect("tenant_details", pk=tenant.pk)
-
     if request.method == "POST":
         building_id = request.POST.get("building_id")
         unitID = request.POST.get("unitID")
@@ -603,10 +610,6 @@ def add_lease(request, pk):
             contractEndDate = contractStartDate + timedelta(days=contractLength*30)
         else:            
             contractEndDate = None
-
-        if Lease.objects.filter(tenantName=tenant, pastLease=False).exists():
-            messages.error(request, "This tenant already has an active lease.")
-            return redirect("tenant_details", pk=tenant.pk)
 
         if not building_id or not unitID:
             messages.error(request, "Please select both a building and a unit.")
@@ -833,16 +836,22 @@ def view_bills(request, pk):
 def add_bill(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
 
-    lease = (
+    leases = (
         Lease.objects
         .filter(tenantName=tenant, pastLease=False)
-        .order_by("-contractStart")
-        .first()
+        .select_related("buildingName", "unitID")
+        .order_by("contractStart", "id")
     )
+    primary_lease = leases.first()
 
-    if not lease:
+    if not primary_lease:
         messages.error(request, "This tenant does not have an active lease.")
         return redirect("view_bills", pk=tenant.pk)
+
+    rent_total = sum(money(l.rentAmount) for l in leases)
+    parking_total = sum(money(l.parkingFees) for l in leases)
+    signage_total = sum(money(l.signageFees) for l in leases)
+    combined_rent_total = rent_total + parking_total + signage_total
 
     if request.method == "POST":
         billing_for = (request.POST.get("billingFor") or "").upper()
@@ -855,11 +864,7 @@ def add_bill(request, pk):
             return redirect("add_bill", pk=tenant.pk)
 
         if billing_for == BillingRecord.RENT:
-            base_amount = (
-                money(lease.rentAmount)
-                + money(lease.parkingFees)
-                + money(lease.signageFees)
-            )
+            base_amount = combined_rent_total
         else:
             amountdue_raw = (amountdue_raw or "0").replace(",", "")
             base_amount = money(Decimal(amountdue_raw))
@@ -892,7 +897,7 @@ def add_bill(request, pk):
 
             duplicate_bill = BillingRecord.objects.filter(
                 tenant=tenant,
-                lease=lease,
+                lease=primary_lease,
                 dateIssued=date_issued,
                 billingFor=billing_for,
                 amountDue=amountdue,
@@ -907,7 +912,7 @@ def add_bill(request, pk):
 
             bill = BillingRecord.objects.create(
                 tenant=tenant,
-                lease=lease,
+                lease=primary_lease,
                 modified_by=admin_account,
                 dateIssued=date_issued,
                 billingFor=billing_for,
@@ -927,7 +932,12 @@ def add_bill(request, pk):
         "billingApp/add_bill.html",
         {
             "tenant": tenant,
-            "lease": lease,
+            "lease": primary_lease,
+            "leases": leases,
+            "rent_total": rent_total,
+            "parking_total": parking_total,
+            "signage_total": signage_total,
+            "combined_rent_total": combined_rent_total,
         }
     )
 
@@ -959,9 +969,29 @@ def add_units(request, pk):
 @login_required
 def view_units(request, pk):
     building = get_object_or_404(Building, pk=pk)
-    units = Units.objects.filter(building=building).order_by("unitID")
+    active_leases = Lease.objects.filter(unitID=OuterRef("pk"), pastLease=False)
+    units = (
+        Units.objects.filter(building=building)
+        .annotate(is_occupied=Exists(active_leases))
+        .order_by("unitID")
+    )
     date_today = get_date_today()
     return render(request, "billingApp/view_units.html", {"building": building, "units": units, "date_today": date_today})
+
+
+@login_required
+@require_POST
+def delete_unit(request, pk):
+    unit = get_object_or_404(Units, pk=pk)
+    building_pk = unit.building_id
+
+    if Lease.objects.filter(unitID=unit, pastLease=False).exists():
+        messages.error(request, "Cannot delete this unit because it is currently occupied.")
+        return redirect("view_units", pk=building_pk)
+
+    unit.delete()
+    messages.success(request, "Unit deleted successfully.")
+    return redirect("view_units", pk=building_pk)
 
 
 @login_required
@@ -1040,13 +1070,13 @@ from .models import Tenant, BillingRecord
 @login_required
 def soa(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
-    lease = (
+    active_leases = list(
         Lease.objects
         .filter(tenantName=tenant, pastLease=False)
         .select_related("buildingName", "unitID")
         .order_by("-contractStart", "-id")
-        .first()
     )
+    lease = active_leases[0] if active_leases else None
 
     if not lease:
         messages.error(request, "This tenant does not have an active lease. Unable to generate SOA.")
@@ -1067,14 +1097,26 @@ def soa(request, pk):
 
     for b in bills_qs:
         amount = (b.balance or Decimal("0.00")).quantize(Decimal("0.01"))
+        penalty_amount = money(b.penaltyFee)
+        principal_amount = money(amount - penalty_amount)
+        if principal_amount < Decimal("0.00"):
+            principal_amount = Decimal("0.00")
 
         bill_no = f"BL-{b.id:06d}"
         
         if b.billingFor == BillingRecord.RENT:
-            # For rent bills, calculate components
-            rent_amount = (b.lease.rentAmount or Decimal("0.00")).quantize(Decimal("0.01"))
-            parking_fees = (b.lease.parkingFees or Decimal("0.00")).quantize(Decimal("0.01"))
-            signage_fees = (b.lease.signageFees or Decimal("0.00")).quantize(Decimal("0.01"))
+            rent_amount = sum(
+                (lease_item.rentAmount or Decimal("0.00"))
+                for lease_item in active_leases
+            ).quantize(Decimal("0.01"))
+            parking_fees = sum(
+                (lease_item.parkingFees or Decimal("0.00"))
+                for lease_item in active_leases
+            ).quantize(Decimal("0.01"))
+            signage_fees = sum(
+                (lease_item.signageFees or Decimal("0.00"))
+                for lease_item in active_leases
+            ).quantize(Decimal("0.01"))
             
             # Derive VAT as 12% of rent amount
             vat_amount = (rent_amount * Decimal("0.12")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -1086,7 +1128,7 @@ def soa(request, pk):
             
             # Calculate scale factor for remaining balance
             if original_total > Decimal("0.00"):
-                scale = amount / original_total
+                scale = principal_amount / original_total
             else:
                 scale = Decimal("1.00")
             
@@ -1096,29 +1138,77 @@ def soa(request, pk):
             scaled_parking = (parking_fees * scale).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             scaled_signage = (signage_fees * scale).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             
-            # Combine into one line
-            total_amount = scaled_base_rent + scaled_parking + scaled_signage
-            total_vat = scaled_vat
-            total_line = total_amount + total_vat
+            rent_total = scaled_base_rent + scaled_vat
+            split_total = rent_total + scaled_signage + scaled_parking
+            rounding_adjustment = principal_amount - split_total
+
+            if signage_fees == Decimal("0.00") and parking_fees == Decimal("0.00"):
+                scaled_base_rent += rounding_adjustment
+                rent_total += rounding_adjustment
             
             lines.append({
                 "no": bill_no,
                 "date": b.dateIssued,
                 "particulars": "Rent",
-                "amount": total_amount,
-                "vat": total_vat,
-                "total": total_line,
-                "amount_display": f"{total_amount:,.2f}",
-                "vat_display": f"{total_vat:,.2f}",
-                "total_display": f"{total_line:,.2f}",
+                "amount": scaled_base_rent,
+                "vat": scaled_vat,
+                "total": rent_total,
+                "amount_display": f"{scaled_base_rent:,.2f}",
+                "vat_display": f"{scaled_vat:,.2f}",
+                "total_display": f"{rent_total:,.2f}",
             })
+
+            if signage_fees > Decimal("0.00"):
+                signage_total = scaled_signage
+                if parking_fees == Decimal("0.00"):
+                    signage_total += rounding_adjustment
+
+                lines.append({
+                    "no": bill_no,
+                    "date": b.dateIssued,
+                    "particulars": "Signage",
+                    "amount": signage_total,
+                    "vat": Decimal("0.00"),
+                    "total": signage_total,
+                    "amount_display": f"{signage_total:,.2f}",
+                    "vat_display": "0.00",
+                    "total_display": f"{signage_total:,.2f}",
+                })
+
+            if parking_fees > Decimal("0.00"):
+                parking_total = scaled_parking + rounding_adjustment
+
+                lines.append({
+                    "no": bill_no,
+                    "date": b.dateIssued,
+                    "particulars": "Parking",
+                    "amount": parking_total,
+                    "vat": Decimal("0.00"),
+                    "total": parking_total,
+                    "amount_display": f"{parking_total:,.2f}",
+                    "vat_display": "0.00",
+                    "total_display": f"{parking_total:,.2f}",
+                })
             
+            if penalty_amount > Decimal("0.00"):
+                lines.append({
+                    "no": bill_no,
+                    "date": b.dateIssued,
+                    "particulars": "Penalty",
+                    "amount": penalty_amount,
+                    "vat": Decimal("0.00"),
+                    "total": penalty_amount,
+                    "amount_display": f"{penalty_amount:,.2f}",
+                    "vat_display": "0.00",
+                    "total_display": f"{penalty_amount:,.2f}",
+                })
+
             grand_total += amount
             
         else:
             # For non-rent bills
-            total = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            grand_total += total
+            total = principal_amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            grand_total += amount
 
             particulars = ""
             if b.billingFor == BillingRecord.ELECTRICITY:
@@ -1137,6 +1227,41 @@ def soa(request, pk):
                 "vat_display": "0.00",
                 "total_display": f"{total:,.2f}",
             })
+
+            if penalty_amount > Decimal("0.00"):
+                lines.append({
+                    "no": bill_no,
+                    "date": b.dateIssued,
+                    "particulars": "Penalty",
+                    "amount": penalty_amount,
+                    "vat": Decimal("0.00"),
+                    "total": penalty_amount,
+                    "amount_display": f"{penalty_amount:,.2f}",
+                    "vat_display": "0.00",
+                    "total_display": f"{penalty_amount:,.2f}",
+                })
+
+    carryover_balance = money(tenant.carryover_balance)
+    if carryover_balance != Decimal("0.00"):
+        if carryover_balance > Decimal("0.00"):
+            carryover_total = -carryover_balance
+            particulars = "Overpayment Credit"
+        else:
+            carryover_total = abs(carryover_balance)
+            particulars = "Underpayment Debit"
+
+        lines.append({
+            "no": "",
+            "date": None,
+            "particulars": particulars,
+            "amount": carryover_total,
+            "vat": Decimal("0.00"),
+            "total": carryover_total,
+            "amount_display": f"{carryover_total:,.2f}",
+            "vat_display": "0.00",
+            "total_display": f"{carryover_total:,.2f}",
+        })
+        grand_total += carryover_total
 
     company_display = (tenant.companyName or "").strip() or tenant.contactPerson
     
@@ -1875,15 +2000,3 @@ def add_penalty(request, pk):
         "tenant": tenant,
         "date_today": date_today,
     })
-
-def delete_unit(request, pk):
-    unit = get_object_or_404(Units, pk=pk)
-    building = unit.building_id
-
-    if Lease.objects.filter(unitID=unit, pastLease=False).exists():
-        messages.error(request, "Cannot delete a unit that has an active lease.")
-        return redirect("view_units")
-
-    unit.delete()
-    messages.success(request, "Unit deleted successfully.")
-    return redirect("view_units", pk=building)

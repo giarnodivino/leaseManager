@@ -242,7 +242,7 @@
             {% for l in lines %}
             <tr>
               <td class="center">{{ l.no }}</td>
-              <td class="center">{{ l.date|date:"Y-m-d" }}</td>
+              <td class="center">{% if l.date %}{{ l.date|date:"Y-m-d" }}{% endif %}</td>
               <td>{{ l.particulars }}</td>
               <td class="right">{{ l.amount_display }}</td>
               <td class="right">{{ l.vat_display }}</td>

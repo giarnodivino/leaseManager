@@ -27,22 +27,26 @@
                         <td>{{ unit.unitID }}</td>
 
                         <td>
-                            {% if unit.lease_set.exists %}
+                            {% if unit.is_occupied %}
                                 Occupied
                             {% else %}
                                 Available
                             {% endif %}
                         </td>
+
                         <td>
-                            {% if not unit.lease_set.exists %}
-                                <a href="{% url 'delete_unit' pk=unit.pk %}" class="button is-danger">Delete</a>
+                            {% if not unit.is_occupied %}
+                                <form method="POST" action="{% url 'delete_unit' pk=unit.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="button is-small is-danger">Delete</button>
+                                </form>
                             {% endif %}
                         </td>
                     </tr>
 
                     {% empty %}
                     <tr>
-                        <td colspan="2">No units found for this building.</td>
+                        <td colspan="3">No units found for this building.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
