@@ -1,0 +1,99 @@
+{% extends 'billingApp/base.html' %} {% load static %} {% block content %}
+</div>
+
+<div class="p-5">
+  <a href="{% url 'tenant_details' pk=t.pk %}" class="button" style="background-color: #f7f2ed">Back to Tenant Details</a>
+</div>
+
+<div class="card card2">
+  <div class="card-content has-text-centered">
+    <h1 class="is-size-3 has-text-weight-bold p-5 mt-2">Past Leases for {{ t.companyName_display }}</h1>
+    <div class="columns">
+      <div class="column">
+        <p class="is-size-5 has-text-weight-normal p-1">Tenant Details:</p>
+      </div>
+      <div class="column">
+        <p class="is-size-5 has-text-weight-normal p-1">Past Lease Details:</p>
+      </div>
+    </div>
+    <div class="columns">
+      <div class="column">
+        <p class="is-size-5 has-text-weight-normal">Contact Person: <strong>{{ t.contactPerson }}</strong></p>
+        <p class="is-size-5 p-2">
+          Phone Number:
+          <strong>{{ t.phoneNumber }}</strong>
+        </p>
+        <p class="is-size-5 p-2">
+          Email:
+          <strong>{{ t.email }}</strong>
+        </p>
+        <p class="is-size-5 p-2">Modified By: <strong>{{ t.modified_by }}</strong></p>
+        <p class="is-size-5 p-2">Last Modified: <strong>{{ t.modified_at }}</strong></p>
+      </div>
+      <div class="column">
+        {% if leases %}
+        <div class="buttons is-centered mb-4">
+          {% for l in leases %}
+          <button type="button" class="button lease-filter {% if forloop.first %}is-primary{% endif %}" data-lease-filter="{{ l.pk }}">Lease {{ forloop.counter }}</button>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% for l in leases %}
+        <div class="tenant-lease mb-5" data-lease-id="{{ l.pk }}" {% if not forloop.first %}style="display: none;"{% endif %}>
+          <p class="is-size-5 has-text-weight-bold">Past Lease {{ forloop.counter }}</p>
+          <p class="is-size-5 has-text-weight-normal">Unit: <strong>{{ l.unitID }}</strong></p>
+          <p class="is-size-5 has-text-weight-normal">Monthly Rent: ₱ <strong>{{ l.rentAmount }}</strong></p>
+          <p class="is-size-5 has-text-weight-normal">VAT Amount: ₱ <strong>{{ l.vatAmount }}</strong></p>
+          <p class="is-size-5 has-text-weight-normal">Parking Fees: <strong>{{ l.parkingFees }}</strong></p>
+          <p class="is-size-5 has-text-weight-normal">Signage Fees: <strong>{{ l.signageFees }}</strong></p>
+          <p class="is-size-5 has-text-weight-normal">Start Date: <strong>{{ l.contractStart }}</strong></p>
+          <p class="is-size-5 has-text-weight-normal">End Date: <strong>{{ l.contractEnd }}</strong></p>
+          <p class="is-size-5 has-text-weight-normal">Archived Date: <strong>{{ l.archived_date }}</strong></p>
+          <p class="is-size-5 has-text-weight-normal">Modified By: <strong>{{ l.modified_by }}</strong></p>
+          <p class="is-size-5 has-text-weight-normal">Last Modified: <strong>{{ l.modified_at }}</strong></p>
+
+          <div class="buttons is-centered p-4">
+            <a href="{% url 'delete_lease' pk=l.pk %}" class="button is-danger">DELETE LEASE</a>
+            {% if l.leaseAttachment %}
+              <a href="{{ l.leaseAttachment.url }}" target="_blank" class="button is-info">
+                View Lease Attachment
+              </a>
+            {% else %}
+              <span class="has-text-grey">No attachment</span>
+            {% endif %}
+          </div>
+        </div>
+        {% empty %}
+        <p class="has-text-grey">No past leases.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% include 'billingApp/includes/messages.html' %}
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const filterButtons = document.querySelectorAll(".lease-filter");
+    const leaseBlocks = document.querySelectorAll(".tenant-lease");
+
+    filterButtons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        const selectedLease = button.dataset.leaseFilter;
+
+        leaseBlocks.forEach(function (leaseBlock) {
+          const shouldShow = leaseBlock.dataset.leaseId === selectedLease;
+          leaseBlock.style.display = shouldShow ? "" : "none";
+        });
+
+        filterButtons.forEach(function (btn) {
+          btn.classList.remove("is-primary");
+        });
+        button.classList.add("is-primary");
+      });
+    });
+  });
+</script>
+
+{% endblock %}

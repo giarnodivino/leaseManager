@@ -498,6 +498,23 @@ def tenant_details(request, pk):
     return render(request, 'billingApp/tenant_details.html', {'t': tenant, 'leases': leases, 'date_today': date_today})
 
 @login_required
+def past_leases(request, pk):
+    tenant = get_object_or_404(Tenant, pk=pk)
+    leases = (
+        Lease.objects
+        .filter(tenantName=tenant, pastLease=True)
+        .select_related("buildingName", "unitID")
+        .order_by("-archived_date", "-contractEnd", "-contractStart", "-id")
+    )
+
+    if not (tenant.companyName or "").strip():
+        tenant.companyName_display = tenant.contactPerson
+    else:
+        tenant.companyName_display = tenant.companyName
+
+    return render(request, "billingApp/past_leases.html", {"t": tenant, "leases": leases})
+
+@login_required
 def send_reminder_email(request, tenant_id):
     tenant = get_object_or_404(Tenant, pk=tenant_id)
     
@@ -1526,22 +1543,16 @@ def view_proof_of_payment(request, pk):
 @login_required
 def renew_lease(request, pk):
     """
-    Renew/edit a tenant's active lease.
+    Renew/edit an active lease.
     Archives the current lease and creates a new lease with updated terms.
     """
 
-    tenant = get_object_or_404(Tenant, pk=pk)
-
-    lease = (
-        Lease.objects
-        .filter(tenantName=tenant, pastLease=False)
-        .order_by("-contractStart")
-        .first()
+    lease = get_object_or_404(
+        Lease.objects.select_related("tenantName", "buildingName", "unitID"),
+        pk=pk,
+        pastLease=False,
     )
-
-    if not lease:
-        messages.error(request, "Cannot renew lease because this tenant does not have an active lease.")
-        return redirect("tenant_details", pk=tenant.pk)
+    tenant = lease.tenantName
 
     if lease_has_pending_bills(lease):
         messages.error(
@@ -1619,12 +1630,7 @@ def renew_lease(request, pk):
             from datetime import datetime, timedelta
             contract_start_date = datetime.strptime(new_contract_start, "%Y-%m-%d").date()
             contract_end_date = contract_start_date + timedelta(days=new_contract_length * 30)
-            
-            # Archive the old lease (mark as pastLease=True)
-            lease.pastLease = True
-            lease.modified_by = admin_account
-            lease.save()
-            
+
             if lease_attachment:
                 allowed_types = ["application/pdf", "image/jpeg", "image/png", "image/webp"]
 
@@ -1637,6 +1643,11 @@ def renew_lease(request, pk):
                         "unit": unit,
                         "date_today": date_today,
                     })
+
+            # Archive the old lease (mark as pastLease=True)
+            lease.pastLease = True
+            lease.modified_by = admin_account
+            lease.save()
 
             # Create the new lease with updated terms
             new_lease = Lease.objects.create(

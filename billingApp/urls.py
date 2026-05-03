@@ -11,6 +11,7 @@ urlpatterns = [
     path('delete_building/<int:pk>/', views.delete_building, name='delete_building'),
     path('add_tenant/', views.add_tenant, name='add_tenant'),
     path('tenant_details/<int:pk>/', views.tenant_details, name='tenant_details'),
+    path('past_leases/<int:pk>/', views.past_leases, name='past_leases'),
     path('delete_tenant/<int:pk>/', views.delete_tenant, name='delete_tenant'),
     path('add_lease/<int:pk>/', views.add_lease, name='add_lease'),
     path('delete_lease/<int:pk>/', views.delete_lease, name='delete_lease'),
