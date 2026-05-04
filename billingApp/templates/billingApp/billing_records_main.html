@@ -89,6 +89,7 @@
           </div>
 
           <div class="column has-text-right">
+            <a href="{% url 'export_bills_report' %}?{{ request.GET.urlencode }}" class="button mb-2">Export CSV</a>
             <input id="searchInput" type="text" class="input searchInput" placeholder="Search Tenants..." />
           </div>
         </div>

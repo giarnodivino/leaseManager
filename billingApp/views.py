@@ -1,3 +1,5 @@
+import csv
+
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Tenant, Building, Lease, BillingRecord, Account, Units, Payment
 from django.contrib import messages
@@ -5,6 +7,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
+from django.http import HttpResponse
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from django.db.models import Exists, OuterRef, Sum
@@ -221,6 +224,38 @@ def get_logged_in_account(request):
         username=username,
         password="AUTO_SYNC",
     )
+
+
+def get_tenant_display_name(tenant):
+    if not tenant:
+        return ""
+
+    company_name = (tenant.companyName or "").strip()
+    return company_name or tenant.contactPerson
+
+
+def create_csv_response(filename):
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response.write("\ufeff")
+    return response
+
+
+def apply_report_filters(queryset, request, lease_prefix="lease", tenant_prefix="tenant"):
+    building_filter = request.GET.get("building")
+    lease_status_filter = request.GET.get("lease_status")
+
+    if building_filter:
+        queryset = queryset.filter(**{f"{lease_prefix}__buildingName_id": building_filter})
+
+    if lease_status_filter == "active":
+        queryset = queryset.filter(**{f"{lease_prefix}__pastLease": False})
+    elif lease_status_filter == "none":
+        queryset = queryset.exclude(
+            **{f"{tenant_prefix}__lease__pastLease": False}
+        )
+
+    return queryset
 
 
 def register_admin(request):
@@ -771,6 +806,57 @@ def billing_records_main(request):
         }
     )
 
+
+@login_required
+def export_bills_report(request):
+    bills = BillingRecord.objects.select_related(
+        "tenant",
+        "lease",
+        "lease__buildingName",
+        "lease__unitID",
+    ).order_by("-dateIssued", "-id")
+
+    bills = apply_report_filters(bills, request)
+
+    response = create_csv_response("bills_report.csv")
+    writer = csv.writer(response)
+    writer.writerow([
+        "Bill No",
+        "Tenant",
+        "Contact Person",
+        "Building",
+        "Unit",
+        "Billing For",
+        "Date Issued",
+        "Date Due",
+        "Amount Due",
+        "Penalty Fee",
+        "Total Due",
+        "Balance",
+        "Carryover Adjustment",
+        "Status",
+    ])
+
+    for bill in bills:
+        writer.writerow([
+            bill.billing_number(),
+            get_tenant_display_name(bill.tenant),
+            bill.tenant.contactPerson if bill.tenant else "",
+            bill.lease.buildingName.buildingName if bill.lease_id else "",
+            bill.lease.unitID.unitID if bill.lease_id and bill.lease.unitID_id else "",
+            bill.get_billingFor_display(),
+            bill.dateIssued,
+            bill.dateDue,
+            money(bill.amountDue),
+            money(bill.penaltyFee),
+            get_bill_total_due(bill),
+            money(bill.balance),
+            money(bill.carryoverAdjustment),
+            bill.get_status_display(),
+        ])
+
+    return response
+
 @login_required
 def view_bills(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
@@ -1120,6 +1206,60 @@ def payments_main(request):
             "date_today": date_today,
         }
     )
+
+
+@login_required
+def export_payments_report(request):
+    payments = Payment.objects.select_related(
+        "tenantID",
+        "billingID",
+        "billingID__lease",
+        "billingID__lease__buildingName",
+        "billingID__lease__unitID",
+    ).order_by("-datePaid", "-id")
+
+    payments = apply_report_filters(
+        payments,
+        request,
+        lease_prefix="billingID__lease",
+        tenant_prefix="tenantID",
+    )
+
+    response = create_csv_response("payments_report.csv")
+    writer = csv.writer(response)
+    writer.writerow([
+        "Payment ID",
+        "Reference Number",
+        "Tenant",
+        "Contact Person",
+        "Building",
+        "Unit",
+        "Bill No",
+        "Billing For",
+        "Date Paid",
+        "Amount Paid",
+        "Payment Method",
+    ])
+
+    for payment in payments:
+        bill = payment.billingID
+        lease = bill.lease if bill and bill.lease_id else None
+
+        writer.writerow([
+            payment.id,
+            payment.referenceNumber,
+            get_tenant_display_name(payment.tenantID),
+            payment.tenantID.contactPerson if payment.tenantID else "",
+            lease.buildingName.buildingName if lease else "",
+            lease.unitID.unitID if lease and lease.unitID_id else "",
+            bill.billing_number() if bill else "",
+            bill.get_billingFor_display() if bill else "",
+            payment.datePaid,
+            money(payment.amountPaid),
+            payment.get_paymentMethod_display() if payment.paymentMethod else "",
+        ])
+
+    return response
 
 def view_payments(request, pk):
     tenant = get_object_or_404(Tenant, pk=pk)
